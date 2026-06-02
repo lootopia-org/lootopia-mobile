@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 export type AuthMethod = 'totp' | 'webauthn';
 
@@ -12,6 +12,27 @@ export type User = {
   id: string;
   username: string;
   email: string;
+};
+
+export type TotpEnrollBeginResponse = {
+  secret: string;
+  otpauthUri: string;
+};
+
+export type WebauthnBeginResponse = {
+  handle: string;
+  publicKey: any;
+};
+
+export type WebauthnCompleteResponse = {
+  token: string;
+};
+
+export type WebauthnCredential = {
+  id: string;
+  name?: string;
+  createdAt: string;
+  lastUsedAt?: string;
 };
 
 type ApiError = {
@@ -55,6 +76,11 @@ export const authApi = {
       body: JSON.stringify({ email, password }),
     }),
 
+  verifyEmail: (token: string) =>
+    request<void>(`/auth/verify-email?token=${encodeURIComponent(token)}`, {
+      method: 'GET',
+    }),
+
   resendVerification: (email: string) =>
     request<void>('/auth/resend-verification', {
       method: 'POST',
@@ -73,6 +99,19 @@ export const authApi = {
       body: JSON.stringify({ token, code }),
     }),
 
+  // WebAuthn login
+  beginWebauthnLogin: (email: string) =>
+    request<WebauthnBeginResponse>('/auth/webauthn/login/begin', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  completeWebauthnLogin: (handle: string, credential: unknown) =>
+    request<WebauthnCompleteResponse>('/auth/webauthn/login/complete', {
+      method: 'POST',
+      body: JSON.stringify({ handle, credential }),
+    }),
+
   me: (token: string) =>
     request<User>('/me', {
       method: 'GET',
@@ -84,6 +123,59 @@ export const authApi = {
   logout: (token: string) =>
     request<void>('/auth/logout', {
       method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+  // TOTP enrollment
+  beginTotpEnroll: (token: string) =>
+    request<TotpEnrollBeginResponse>('/auth/totp/enroll/begin', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+  verifyTotpEnroll: (token: string, code: string) =>
+    request<void>('/auth/totp/enroll/verify', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ code }),
+    }),
+
+  disableTotp: (token: string, code: string) =>
+    request<void>('/auth/totp/disable', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ code }),
+    }),
+
+  // WebAuthn registration
+  beginWebauthnRegister: (token: string) =>
+    request<WebauthnBeginResponse>('/auth/webauthn/register/begin', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+  completeWebauthnRegister: (token: string, handle: string, credential: unknown) =>
+    request<void>('/auth/webauthn/register/complete', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ handle, credential }),
+    }),
+
+  listWebauthnCredentials: (token: string) =>
+    request<WebauthnCredential[]>('/auth/webauthn/credentials', {
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
       },
