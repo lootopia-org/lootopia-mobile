@@ -13,11 +13,11 @@ Application Expo React Native centrée sur le parcours joueur :
 
 ## Stack
 
-- **Expo SDK 55** · React Native 0.83.6 · React 19.2.0
+- **Expo SDK 54** · React Native 0.81.x · React 19.1.0
 - **expo-router** (routing par fichiers)
 - Libs natives : `react-native-maps`, `expo-camera`, `expo-location`, `expo-secure-store`, `expo-linear-gradient`
 
-> Toutes ces libs natives sont incluses dans **Expo Go** pour le SDK 55 — aucun build custom n'est nécessaire pour tester.
+> Toutes ces libs natives sont incluses dans **Expo Go** pour le SDK 54 — aucun build custom n'est nécessaire pour tester.
 
 ## Installation
 
@@ -26,7 +26,7 @@ cd lootopia-mobile
 npm install
 ```
 
-> Les versions des paquets sont alignées sur celles attendues par Expo SDK 55.
+> Les versions des paquets sont alignées sur celles attendues par Expo SDK 54.
 > Pour vérifier ou corriger un éventuel décalage : `npx expo install --check` (puis `--fix`).
 
 ## Lancer le serveur de dev
