@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '@/src/state/AuthContext';
+import { useDemo } from '@/src/state/DemoContext';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, verifyTotp, clearMfaState, loginStage, pendingMethods, resendVerification } = useAuth();
+  const { signIn, signInDemo, verifyTotp, clearMfaState, loginStage, pendingMethods, resendVerification } = useAuth();
+  const { demoMode, toggleDemo } = useDemo();
   const [email, setEmail] = useState('player@lootopia.app');
   const [password, setPassword] = useState('password');
   const [code, setCode] = useState('');
@@ -18,6 +20,12 @@ export default function LoginScreen() {
       setIsLoading(true);
       setError(null);
       setInfo(null);
+
+      if (demoMode) {
+        await signInDemo();
+        router.replace('/(tabs)/chases');
+        return;
+      }
 
       if (loginStage === 'mfa' && pendingMethods.includes('totp')) {
         await verifyTotp(code);
@@ -69,6 +77,17 @@ export default function LoginScreen() {
       <Text style={styles.title}>Lootopia Mobile</Text>
       <Text style={styles.subtitle}>Accès joueur pour les chasses, les étapes et le compte.</Text>
 
+      <Pressable
+        style={[styles.demoButton, demoMode && styles.demoButtonActive]}
+        onPress={toggleDemo}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: demoMode }}
+      >
+        <Text style={[styles.demoButtonText, demoMode && styles.demoButtonTextActive]}>
+          {demoMode ? '🧪 Mode démo activé — validation sans GPS' : 'Activer le mode démo (mock)'}
+        </Text>
+      </Pressable>
+
       <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" />
 
       {loginStage === 'credentials' ? (
@@ -81,7 +100,7 @@ export default function LoginScreen() {
       {info && <Text style={styles.info}>{info}</Text>}
 
       <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
-        <Text style={styles.buttonText}>{loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
+        <Text style={styles.buttonText}>{demoMode ? 'Entrer en mode démo' : loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
       </Pressable>
 
       {loginStage === 'mfa' && (
@@ -111,6 +130,10 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#ff6b35', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 8 },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  demoButton: { borderWidth: 1, borderColor: '#ff6b35', borderStyle: 'dashed', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 16, alignItems: 'center' },
+  demoButtonActive: { backgroundColor: '#fff1e9', borderStyle: 'solid' },
+  demoButtonText: { color: '#ff6b35', fontWeight: '700', fontSize: 14 },
+  demoButtonTextActive: { color: '#c2410c' },
   error: { color: '#b91c1c', marginBottom: 8 },
   info: { color: '#075985', marginBottom: 8 },
   linkButton: { marginTop: 10 },

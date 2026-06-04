@@ -14,6 +14,7 @@ type AuthContextValue = {
   pendingMethods: Array<'totp' | 'webauthn'>;
   emailNotVerified: boolean;
   signIn: (email: string, password: string) => Promise<{ mfaRequired: boolean }>;
+  signInDemo: () => Promise<void>;
   verifyTotp: (code: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
   signUp: (payload: { email: string; password: string }) => Promise<void>;
@@ -24,6 +25,7 @@ type AuthContextValue = {
 const STORAGE_KEY = 'lootopia-mobile-user';
 const TOKEN_KEY = 'lootopia-mobile-token';
 const PENDING_TOKEN_KEY = 'lootopia-mobile-pending-token';
+const DEMO_TOKEN = 'demo-token';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -47,10 +49,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedUser && storedToken) {
         try {
           const parsedUser = JSON.parse(storedUser) as User;
-          const refreshedUser = await authApi.me(storedToken);
-          setUser(refreshedUser);
-          setToken(storedToken);
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(refreshedUser));
+          if (storedToken === DEMO_TOKEN) {
+            // Session démo (mock) : on restaure sans appel réseau.
+            setUser(parsedUser);
+            setToken(storedToken);
+          } else {
+            const refreshedUser = await authApi.me(storedToken);
+            setUser(refreshedUser);
+            setToken(storedToken);
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(refreshedUser));
+          }
         } catch {
           await Promise.all([
             AsyncStorage.removeItem(STORAGE_KEY),
@@ -121,6 +129,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await persistPendingToken(null);
 
         return { mfaRequired: false };
+      },
+      signInDemo: async () => {
+        const demoUser: User = {
+          id: 'demo-player',
+          username: 'Joueur démo',
+          email: 'demo@lootopia.app',
+        };
+
+        await persistToken(DEMO_TOKEN);
+        await persist(demoUser);
+        setLoginStage('credentials');
+        setPendingMethods([]);
+        await persistPendingToken(null);
       },
       verifyTotp: async (code: string) => {
         if (!pendingToken) {

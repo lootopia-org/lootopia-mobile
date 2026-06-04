@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
+import { useDemo } from '@/src/state/DemoContext';
 
 type ARExperienceProps = {
   clue: string;
@@ -34,6 +35,7 @@ const haversineDistanceMeters = (
 };
 
 export function ARExperience({ clue, targetLocation, radiusMeters, onComplete }: ARExperienceProps) {
+  const { demoMode } = useDemo();
   const [permission, requestPermission] = useCameraPermissions();
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -73,7 +75,7 @@ export function ARExperience({ clue, targetLocation, radiusMeters, onComplete }:
   }, [currentLocation, targetLocation]);
 
   const isWithinRange = distanceMeters !== null && distanceMeters <= radiusMeters;
-  const isReadyToValidate = isWithinRange;
+  const isReadyToValidate = demoMode || isWithinRange;
 
   const handleValidate = () => {
     if (!isReadyToValidate) {
@@ -113,7 +115,13 @@ export function ARExperience({ clue, targetLocation, radiusMeters, onComplete }:
         <Text style={styles.kicker}>AR EXPERIENCE</Text>
         <Text style={styles.title}>Indice en réalité augmentée</Text>
         <Text style={styles.text}>{clue}</Text>
-        <Text style={styles.statusText}>{locationPermissionGranted ? `Position: ${distanceMeters ?? '?'} m du point` : 'Géolocalisation indisponible'}</Text>
+        <Text style={styles.statusText}>
+          {demoMode
+            ? '🧪 Mode démo — validation autorisée partout'
+            : locationPermissionGranted
+              ? `Position: ${distanceMeters ?? '?'} m du point`
+              : 'Géolocalisation indisponible'}
+        </Text>
         <Text style={styles.helperText}>{validationMessage || 'Approche-toi du point pour valider l’étape.'}</Text>
         <Pressable style={[styles.button, !isReadyToValidate && styles.buttonDisabled]} onPress={handleValidate}>
           <Text style={styles.buttonText}>{hasLaunched ? 'Étape validée' : isReadyToValidate ? 'Valider l’étape' : 'Validation bloquée'}</Text>
