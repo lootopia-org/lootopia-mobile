@@ -15,3 +15,8 @@ ios/
 
 # Logs
 logs/
+
+# Local env (EXPO_PUBLIC_* etc.)
+.env
+.env.local
+.env*.local
