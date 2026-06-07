@@ -52,6 +52,20 @@ export default function LoginScreen() {
     }
   };
 
+  const handleDemo = async (role: 'admin' | 'partner' | 'player') => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setInfo(null);
+      await signInDemo(role);
+      router.replace('/(tabs)/chases');
+    } catch {
+      setError('Connexion démo impossible.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleResendVerification = async () => {
     try {
       setIsLoading(true);
@@ -88,20 +102,38 @@ export default function LoginScreen() {
         </Text>
       </Pressable>
 
-      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" />
-
-      {loginStage === 'credentials' ? (
-        <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" secureTextEntry />
+      {demoMode ? (
+        <View>
+          <Text style={styles.demoHint}>Choisis un profil de démonstration :</Text>
+          {error && <Text style={styles.error}>{error}</Text>}
+          <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('player')} disabled={isLoading}>
+            <Text style={styles.buttonText}>🎮 Démo Joueur</Text>
+          </Pressable>
+          <Pressable style={[styles.roleButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('partner')} disabled={isLoading}>
+            <Text style={styles.roleButtonText}>🧰 Démo Partenaire (Studio)</Text>
+          </Pressable>
+          <Pressable style={[styles.roleButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('admin')} disabled={isLoading}>
+            <Text style={styles.roleButtonText}>🛡️ Démo Admin (Studio)</Text>
+          </Pressable>
+        </View>
       ) : (
-        <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="Code TOTP" keyboardType="number-pad" />
+        <>
+          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" />
+
+          {loginStage === 'credentials' ? (
+            <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" secureTextEntry />
+          ) : (
+            <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="Code TOTP" keyboardType="number-pad" />
+          )}
+
+          {error && <Text style={styles.error}>{error}</Text>}
+          {info && <Text style={styles.info}>{info}</Text>}
+
+          <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
+            <Text style={styles.buttonText}>{loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
+          </Pressable>
+        </>
       )}
-
-      {error && <Text style={styles.error}>{error}</Text>}
-      {info && <Text style={styles.info}>{info}</Text>}
-
-      <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
-        <Text style={styles.buttonText}>{demoMode ? 'Entrer en mode démo' : loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
-      </Pressable>
 
       {loginStage === 'mfa' && (
         <Pressable style={styles.linkButton} onPress={handleResetMfa}>
@@ -130,6 +162,9 @@ const styles = StyleSheet.create({
   button: { backgroundColor: '#ff6b35', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 8 },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  demoHint: { color: '#6b7280', fontWeight: '600', marginBottom: 6 },
+  roleButton: { backgroundColor: '#1f2937', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10 },
+  roleButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   demoButton: { borderWidth: 1, borderColor: '#ff6b35', borderStyle: 'dashed', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 16, alignItems: 'center' },
   demoButtonActive: { backgroundColor: '#fff1e9', borderStyle: 'solid' },
   demoButtonText: { color: '#ff6b35', fontWeight: '700', fontSize: 14 },

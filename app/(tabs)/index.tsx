@@ -4,22 +4,17 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/src/state/AuthContext';
-import { chaseApi, type Chase, type UserProgress } from '@/src/lib/chase-api';
+import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import { playerStats } from '@/src/data/mock';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [chases, setChases] = useState<Chase[]>([]);
-  const [progress, setProgress] = useState<UserProgress | null>(null);
 
   useEffect(() => {
     (async () => {
-      const nextChases = await chaseApi.getChases();
-      setChases(nextChases);
-
-      if (nextChases[0]) {
-        setProgress(await chaseApi.getProgress(nextChases[0].id));
-      }
+      setChases(await chaseApi.getChases());
     })();
   }, []);
 
@@ -34,16 +29,16 @@ export default function HomeScreen() {
 
         <View style={styles.heroStats}>
           <View style={styles.heroStatCard}>
-            <Text style={styles.heroStatValue}>{progress?.points ?? 0}</Text>
+            <Text style={styles.heroStatValue}>{playerStats.points}</Text>
             <Text style={styles.heroStatLabel}>Points</Text>
           </View>
           <View style={styles.heroStatCard}>
-            <Text style={styles.heroStatValue}>{progress?.currentStep ?? 1}</Text>
-            <Text style={styles.heroStatLabel}>Étape</Text>
+            <Text style={styles.heroStatValue}>{playerStats.level}</Text>
+            <Text style={styles.heroStatLabel}>Niveau</Text>
           </View>
           <View style={styles.heroStatCard}>
-            <Text style={styles.heroStatValue}>{chases.length || 0}</Text>
-            <Text style={styles.heroStatLabel}>Chasses</Text>
+            <Text style={styles.heroStatValue}>{playerStats.completedChases}</Text>
+            <Text style={styles.heroStatLabel}>Terminées</Text>
           </View>
         </View>
       </LinearGradient>

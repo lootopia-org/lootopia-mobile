@@ -8,10 +8,15 @@ export type LoginResponse = {
   mfaMethods: AuthMethod[];
 };
 
+export type UserRole = 'admin' | 'partner' | 'player';
+
 export type User = {
   id: string;
   username: string;
   email: string;
+  // Optionnel : la vraie API /me ne renvoie pas de rôle. Renseigné en mode démo
+  // pour piloter l'accès au Studio (réservé partner/admin).
+  role?: UserRole;
 };
 
 export type TotpEnrollBeginResponse = {

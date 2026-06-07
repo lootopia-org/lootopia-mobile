@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { authApi, type User } from '@/src/lib/auth-api';
+import { authApi, type User, type UserRole } from '@/src/lib/auth-api';
 
 type LoginStage = 'credentials' | 'mfa';
 
@@ -14,7 +14,7 @@ type AuthContextValue = {
   pendingMethods: Array<'totp' | 'webauthn'>;
   emailNotVerified: boolean;
   signIn: (email: string, password: string) => Promise<{ mfaRequired: boolean }>;
-  signInDemo: () => Promise<void>;
+  signInDemo: (role?: UserRole) => Promise<void>;
   verifyTotp: (code: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
   signUp: (payload: { email: string; password: string }) => Promise<void>;
@@ -26,6 +26,13 @@ const STORAGE_KEY = 'lootopia-mobile-user';
 const TOKEN_KEY = 'lootopia-mobile-token';
 const PENDING_TOKEN_KEY = 'lootopia-mobile-pending-token';
 const DEMO_TOKEN = 'demo-token';
+
+// Comptes démo alignés sur les comptes mock du frontend web (mock-auth.ts).
+const DEMO_USERS: Record<UserRole, User> = {
+  admin: { id: 'mock-admin', username: 'Lootopia Admin', email: 'admin@lootopia.local', role: 'admin' },
+  partner: { id: 'mock-partner', username: 'Partner Studio', email: 'partner@lootopia.local', role: 'partner' },
+  player: { id: 'mock-player', username: 'Treasure Player', email: 'player@lootopia.local', role: 'player' },
+};
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -130,15 +137,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return { mfaRequired: false };
       },
-      signInDemo: async () => {
-        const demoUser: User = {
-          id: 'demo-player',
-          username: 'Joueur démo',
-          email: 'demo@lootopia.app',
-        };
-
+      signInDemo: async (role: UserRole = 'player') => {
         await persistToken(DEMO_TOKEN);
-        await persist(demoUser);
+        await persist(DEMO_USERS[role]);
         setLoginStage('credentials');
         setPendingMethods([]);
         await persistPendingToken(null);

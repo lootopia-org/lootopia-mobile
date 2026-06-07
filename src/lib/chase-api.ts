@@ -34,6 +34,9 @@ export type ChaseStep = {
   arContent?: ARContent;
   reward?: number;
   completed: boolean;
+  // Champs propres au mobile : rayon de proximité GPS + indice affiché en AR.
+  radiusMeters?: number;
+  arHint?: string;
 };
 
 export type Chase = {
@@ -80,43 +83,9 @@ type ApiError = {
 
 const fallbackProgressStore = new Map<string, UserProgress>();
 
-const normalizeChase = (chase: (typeof mockChases)[number]): Chase => ({
-  id: chase.id,
-  title: chase.title,
-  description: chase.description,
-  image: chase.image,
-  partner: {
-    id: `partner-${chase.id}`,
-    name: 'Lootopia Partner',
-    email: 'partner@lootopia.local',
-    description: 'Fallback partner data while the API is unavailable.',
-    logo: '',
-    chases: [],
-  },
-  difficulty: chase.difficulty,
-  estimatedDuration: chase.duration,
-  location: chase.steps[0]?.location ?? { latitude: 43.2965, longitude: 5.3698 },
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  status: 'active',
-  participants: 0,
-  rating: 4.5,
-  steps: chase.steps.map((step, index) => ({
-    id: step.id,
-    order: index + 1,
-    title: step.title,
-    description: step.clue,
-    clue: step.clue,
-    location: step.location,
-    arContent: {
-      id: `${step.id}-ar`,
-      type: 'marker',
-      data: step.arHint,
-    },
-    reward: chase.points / chase.steps.length,
-    completed: false,
-  })),
-});
+// Les données mock partagent désormais la même forme `Chase` que l'API (voir
+// src/data/mock.ts, alignées sur le frontend web) : plus besoin de normaliser.
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
 const parseJson = async <T,>(response: Response): Promise<T> => {
   const contentType = response.headers.get('content-type') || '';
@@ -175,7 +144,7 @@ export const chaseApi = {
       const response = await request<unknown>('/chases');
       return normalizeChasesResponse(response);
     } catch {
-      return mockChases.map(normalizeChase);
+      return clone(mockChases);
     }
   },
 
@@ -188,7 +157,7 @@ export const chaseApi = {
         throw new Error('Chase not found');
       }
 
-      return normalizeChase(chase);
+      return clone(chase);
     }
   },
 
@@ -201,7 +170,7 @@ export const chaseApi = {
         return null;
       }
 
-      const progress = ensureFallbackProgress(normalizeChase(chase));
+      const progress = ensureFallbackProgress(chase);
       return progress ?? null;
     }
   },

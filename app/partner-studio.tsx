@@ -19,9 +19,9 @@ export default function PartnerStudioScreen() {
       setIsLoading(true);
       try {
         const all = await chaseApi.getChases();
-        if (user) {
-          const mine = all.filter((c) => c.partner?.email === user.email);
-          setChases(mine);
+        // Comme sur le frontend web, partenaires et admins pilotent toutes les chasses.
+        if (user && (user.role === 'partner' || user.role === 'admin')) {
+          setChases(all);
         } else {
           setChases([]);
         }
@@ -82,6 +82,19 @@ export default function PartnerStudioScreen() {
         <Text style={styles.header}>Partner Studio</Text>
         <Text style={styles.notice}>Vous devez être connecté en tant que partenaire pour accéder à ce studio.</Text>
         <Button title="Se connecter" onPress={() => router.push('/auth/login')} />
+      </View>
+    );
+  }
+
+  // Accès réservé aux partenaires et admins (les joueurs sont bloqués même s'ils forcent l'URL).
+  if (user.role !== 'partner' && user.role !== 'admin') {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.header}>Partner Studio</Text>
+        <Text style={styles.notice}>
+          Cet espace est réservé aux comptes partenaires et administrateurs. Ton profil joueur n’y a pas accès.
+        </Text>
+        <Button title="Retour aux chasses" onPress={() => router.replace('/(tabs)/chases')} />
       </View>
     );
   }
