@@ -40,10 +40,12 @@ export type WebauthnCredential = {
   lastUsedAt?: string;
 };
 
-type ApiError = {
-  message?: string;
-  code?: string;
-};
+// Erreur enrichie comme côté web : l'API renvoie ses erreurs en TEXTE BRUT
+// (ex. "invalid email or password", "missing session token"), parfois en JSON
+// ({"message": ...}). On expose donc le `status` HTTP (fiable) + le corps brut,
+// et un `message` best-effort. La détection (ex. email non vérifié = 403) se fait
+// sur le statut, pas sur un `code` JSON qui n'existe pas.
+export type AuthApiError = Error & { status?: number; body?: string };
 
 const parseJson = async <T,>(response: Response): Promise<T> => {
   const contentType = response.headers.get('content-type') || '';
@@ -65,9 +67,18 @@ const request = async <T,>(path: string, init: RequestInit = {}) => {
   });
 
   if (!response.ok) {
-    const errorBody = await parseJson<ApiError>(response);
-    const error = new Error(errorBody.message || 'Request failed') as Error & { code?: string };
-    error.code = errorBody.code;
+    const body = await response.text();
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      message = parsed.message || parsed.code || body;
+    } catch {
+      // corps en texte brut : on le garde tel quel
+    }
+
+    const error = new Error(message || 'Request failed') as AuthApiError;
+    error.status = response.status;
+    error.body = body;
     throw error;
   }
 

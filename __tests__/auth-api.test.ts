@@ -37,6 +37,8 @@ describe('authApi', () => {
       statusText: 'Error',
       headers: { get: () => 'application/json' },
       json: () => Promise.resolve(data),
+      // Comme une vraie Response : le corps d'erreur est lisible via text().
+      text: () => Promise.resolve(JSON.stringify(data)),
       redirected: false,
       type: 'basic',
       url: '',

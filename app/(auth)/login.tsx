@@ -15,38 +15,49 @@ export default function LoginScreen() {
   const [info, setInfo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Même logique que le web : l'API renvoie des erreurs en texte brut, donc on
+  // branche sur le STATUT HTTP (403 = email non vérifié, 401 = identifiants),
+  // avec repli sur le texte serveur.
+  const showAuthError = (authError: any) => {
+    const status: number | undefined = authError?.status;
+    const text: string = authError?.body ?? authError?.message ?? '';
+
+    if (status === 403 || /verif/i.test(text) || /not_verified/i.test(text)) {
+      setError('Ton email n’est pas encore vérifié.');
+    } else if (status === 401) {
+      setError('Connexion impossible. Vérifie tes identifiants.');
+    } else {
+      setError(text || 'Connexion impossible. Réessaie plus tard.');
+    }
+  };
+
   const handleLogin = async () => {
     try {
       setIsLoading(true);
       setError(null);
       setInfo(null);
 
-      if (demoMode) {
-        await signInDemo();
-        router.replace('/(tabs)/chases');
-        return;
-      }
-
-      if (loginStage === 'mfa' && pendingMethods.includes('totp')) {
-        await verifyTotp(code);
-        router.replace('/(tabs)/chases');
+      if (loginStage === 'mfa') {
+        if (pendingMethods.includes('totp')) {
+          await verifyTotp(code);
+          router.replace('/(tabs)/chases');
+        } else {
+          // L'API exige une passkey (WebAuthn) : non disponible dans Expo Go.
+          setError('Cette connexion exige une passkey, non disponible sur l’app mobile (Expo Go).');
+        }
         return;
       }
 
       const response = await signIn(email, password);
       if (!response.mfaRequired) {
         router.replace('/(tabs)/chases');
-      } else {
+      } else if (pendingMethods.includes('totp')) {
         setInfo('Un code TOTP est requis pour terminer la connexion.');
+      } else {
+        setInfo('Une passkey est requise pour ce compte (non disponible sur mobile).');
       }
     } catch (authError: any) {
-      const apiCode = authError?.code;
-
-      if (apiCode === 'email_not_verified') {
-        setError('Ton email n’est pas encore vérifié.');
-      } else {
-        setError('Connexion impossible. Vérifie tes identifiants.');
-      }
+      showAuthError(authError);
     } finally {
       setIsLoading(false);
     }
