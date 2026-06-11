@@ -31,6 +31,7 @@ const baseSteps = [
     reward: 50,
     completed: false,
     radiusMeters: 120,
+    qrPayload: 'lootopia:step-1',
     arHint: 'Reste près de l’entrée du port pour valider cette étape.',
   },
   {
@@ -49,6 +50,7 @@ const baseSteps = [
     reward: 75,
     completed: false,
     radiusMeters: 120,
+    qrPayload: 'lootopia:step-2',
     arHint: 'Approche-toi de la fresque au centre de la place pour révéler l’indice.',
   },
   {
@@ -61,6 +63,7 @@ const baseSteps = [
     reward: 125,
     completed: false,
     radiusMeters: 120,
+    qrPayload: 'lootopia:step-3',
     arHint: 'Dernière validation à proximité du coffre final.',
   },
 ];

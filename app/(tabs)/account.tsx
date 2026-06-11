@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/src/state/AuthContext';
 import { useHunts, type AvatarModel } from '@/src/state/HuntsContext';
+import { PlayerCharacter3D } from '@/src/components/PlayerCharacter3D';
 import { playerStats } from '@/src/data/mock';
 import { colors, glassCard, glassStrongCard, radii } from '@/src/theme';
 
@@ -38,7 +39,7 @@ export default function AccountScreen() {
       {/* Aperçu du personnage + choix du modèle (MVP : aperçu sprite, remplacé
           plus tard par le rendu GLB — voir conception-prototype-AR-lootopia.md). */}
       <View style={[styles.avatarCard]}>
-        <Text style={styles.avatarSprite}>{avatarModel === 'male' ? '🧍‍♂️' : '🧍‍♀️'}</Text>
+        <PlayerCharacter3D model={avatarModel} walking={false} headingDegrees={25} size={150} showBadge={false} />
         <View style={styles.toggleRow}>
           <ModelToggle current={avatarModel} value="male" label="Homme" onSelect={setAvatarModel} />
           <ModelToggle current={avatarModel} value="female" label="Femme" onSelect={setAvatarModel} />

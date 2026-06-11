@@ -67,6 +67,7 @@ export default function ARScreen() {
         clue={step?.clue ?? clue ?? 'Indice indisponible'}
         targetLocation={step?.location ?? { latitude: 43.2965, longitude: 5.3698 }}
         radiusMeters={step?.radiusMeters ?? 100}
+        qrPayload={step?.qrPayload}
         onComplete={handleComplete}
       />
       <Pressable style={styles.backButton} onPress={() => router.back()}>

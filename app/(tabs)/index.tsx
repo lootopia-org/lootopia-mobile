@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
 import { useHunts } from '@/src/state/HuntsContext';
 import { useDemo } from '@/src/state/DemoContext';
-import { PlayerCharacter } from '@/src/components/PlayerCharacter';
+import { PlayerCharacter3D } from '@/src/components/PlayerCharacter3D';
 import { colors, darkMapStyle, glassStrongCard, radii } from '@/src/theme';
 import { bearingDegrees, formatDistance, haversineDistanceMeters, smoothPosition, type GeoPoint } from '@/src/lib/geo';
 import { playerStats } from '@/src/data/mock';
@@ -31,9 +31,12 @@ export default function MapScreen() {
   const [heading, setHeading] = useState<number | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [selectedHunt, setSelectedHunt] = useState<Chase | null>(null);
+  const [proximityAlert, setProximityAlert] = useState<string | null>(null);
   const sheetAnim = useRef(new Animated.Value(0)).current;
   const lastPosition = useRef<GeoPoint | null>(null);
   const walkingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifiedHuntIds = useRef<Set<string>>(new Set());
+  const proximityTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Chargement des chasses (API → fallback mock géré par chase-api).
   useEffect(() => {
@@ -109,6 +112,40 @@ export default function MapScreen() {
 
   const inProgressCount = Object.keys(acceptedHunts).length;
 
+  // Alerte de proximité in-app : prévenir (une seule fois par chasse) quand une
+  // chasse non acceptée entre dans le rayon de découverte. Remplacera une vraie
+  // notification locale (expo-notifications) en phase suivante.
+  useEffect(() => {
+    if (!effectivePosition) {
+      return;
+    }
+    const nearby = huntsWithDistance.find(
+      ({ hunt, distance }) =>
+        distance !== null &&
+        distance <= 250 &&
+        !isAccepted(hunt.id) &&
+        !notifiedHuntIds.current.has(hunt.id)
+    );
+    if (nearby) {
+      notifiedHuntIds.current.add(nearby.hunt.id);
+      setProximityAlert(nearby.hunt.title);
+      if (proximityTimeout.current) {
+        clearTimeout(proximityTimeout.current);
+      }
+      proximityTimeout.current = setTimeout(() => setProximityAlert(null), 6000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [huntsWithDistance, effectivePosition]);
+
+  useEffect(
+    () => () => {
+      if (proximityTimeout.current) {
+        clearTimeout(proximityTimeout.current);
+      }
+    },
+    []
+  );
+
   const openSheet = (hunt: Chase) => {
     setSelectedHunt(hunt);
     Animated.spring(sheetAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start();
@@ -168,10 +205,10 @@ export default function MapScreen() {
         ))}
       </MapView>
 
-      {/* Personnage : fixe au centre de l'écran, la carte défile sous lui. */}
+      {/* Personnage 3D : fixe au centre de l'écran, la carte défile sous lui. */}
       {effectivePosition && (
         <View pointerEvents="none" style={styles.characterAnchor}>
-          <PlayerCharacter model={avatarModel} walking={walking} headingDegrees={heading} />
+          <PlayerCharacter3D model={avatarModel} walking={walking} headingDegrees={heading} />
         </View>
       )}
 
@@ -190,6 +227,13 @@ export default function MapScreen() {
           <Text style={styles.bannerText}>
             Localisation refusée — active-la dans les réglages, ou utilise le mode démo.
           </Text>
+        </View>
+      )}
+
+      {proximityAlert && (
+        <View style={[styles.proximityBanner, { top: insets.top + 56 }]}>
+          <Text style={styles.proximityTitle}>🧰 Chasse à proximité !</Text>
+          <Text style={styles.proximityText}>« {proximityAlert} » est à moins de 250 m.</Text>
         </View>
       )}
 
@@ -301,6 +345,9 @@ const styles = StyleSheet.create({
   hudTeal: { color: colors.teal, fontWeight: '800', fontSize: 13 },
   banner: { position: 'absolute', left: 14, right: 14, backgroundColor: 'rgba(11,15,26,0.92)', borderColor: colors.danger, borderWidth: 1, borderRadius: radii.md, padding: 10 },
   bannerText: { color: colors.foreground, fontSize: 12, lineHeight: 17 },
+  proximityBanner: { position: 'absolute', left: 14, right: 14, backgroundColor: 'rgba(11,15,26,0.94)', borderColor: colors.gold, borderWidth: 1, borderRadius: radii.md, padding: 12 },
+  proximityTitle: { color: colors.gold, fontWeight: '900', fontSize: 13 },
+  proximityText: { color: colors.foreground, fontSize: 12, marginTop: 3 },
   huntMarker: { alignItems: 'center' },
   huntMarkerIcon: { fontSize: 30, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   huntMarkerBadge: { backgroundColor: 'rgba(11,15,26,0.9)', borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 7, paddingVertical: 2, marginTop: 2 },

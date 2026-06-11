@@ -37,6 +37,9 @@ export type ChaseStep = {
   // Champs propres au mobile : rayon de proximité GPS + indice affiché en AR.
   radiusMeters?: number;
   arHint?: string;
+  // Contenu d'un QR code physique qui valide l'étape (alternative au GPS,
+  // utile en intérieur). Format conseillé : "lootopia:<step-id>".
+  qrPayload?: string;
 };
 
 export type Chase = {
