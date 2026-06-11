@@ -3,6 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '@/src/state/AuthContext';
 import { useDemo } from '@/src/state/DemoContext';
+import { colors, glassCard, radii } from '@/src/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -117,8 +118,8 @@ export default function LoginScreen() {
         <View>
           <Text style={styles.demoHint}>Choisis un profil de démonstration :</Text>
           {error && <Text style={styles.error}>{error}</Text>}
-          <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('player')} disabled={isLoading}>
-            <Text style={styles.buttonText}>🎮 Démo Joueur</Text>
+          <Pressable style={[styles.roleButton, styles.rolePlayerButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('player')} disabled={isLoading}>
+            <Text style={[styles.roleButtonText, styles.rolePlayerButtonText]}>🎮 Démo Joueur</Text>
           </Pressable>
           <Pressable style={[styles.roleButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('partner')} disabled={isLoading}>
             <Text style={styles.roleButtonText}>🧰 Démo Partenaire (Studio)</Text>
@@ -129,12 +130,12 @@ export default function LoginScreen() {
         </View>
       ) : (
         <>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" />
+          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.textFaint} autoCapitalize="none" />
 
           {loginStage === 'credentials' ? (
-            <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" secureTextEntry />
+            <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" placeholderTextColor={colors.textFaint} secureTextEntry />
           ) : (
-            <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="Code TOTP" keyboardType="number-pad" />
+            <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="Code TOTP" placeholderTextColor={colors.textFaint} keyboardType="number-pad" />
           )}
 
           {error && <Text style={styles.error}>{error}</Text>}
@@ -166,22 +167,24 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#fff9f5' },
-  title: { fontSize: 34, fontWeight: '800', color: '#1f2937', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#6b7280', marginBottom: 24 },
-  input: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#f2ddd2' },
-  button: { backgroundColor: '#ff6b35', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 8 },
+  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.background },
+  title: { fontSize: 34, fontWeight: '900', color: colors.foreground, marginBottom: 8 },
+  subtitle: { fontSize: 16, color: colors.textMuted, marginBottom: 24 },
+  input: { ...glassCard, borderRadius: radii.md, padding: 16, marginBottom: 12, color: colors.foreground },
+  button: { backgroundColor: colors.gold, paddingVertical: 16, borderRadius: radii.md, alignItems: 'center', marginTop: 8 },
   buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  demoHint: { color: '#6b7280', fontWeight: '600', marginBottom: 6 },
-  roleButton: { backgroundColor: '#1f2937', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10 },
-  roleButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  demoButton: { borderWidth: 1, borderColor: '#ff6b35', borderStyle: 'dashed', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 16, alignItems: 'center' },
-  demoButtonActive: { backgroundColor: '#fff1e9', borderStyle: 'solid' },
-  demoButtonText: { color: '#ff6b35', fontWeight: '700', fontSize: 14 },
-  demoButtonTextActive: { color: '#c2410c' },
-  error: { color: '#b91c1c', marginBottom: 8 },
-  info: { color: '#075985', marginBottom: 8 },
+  buttonText: { color: colors.background, fontWeight: '900', fontSize: 16 },
+  demoHint: { color: colors.textMuted, fontWeight: '600', marginBottom: 6 },
+  roleButton: { ...glassCard, borderRadius: radii.md, paddingVertical: 16, alignItems: 'center', marginTop: 10 },
+  roleButtonText: { color: colors.foreground, fontWeight: '700', fontSize: 15 },
+  rolePlayerButton: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  rolePlayerButtonText: { color: colors.gold, fontWeight: '900' },
+  demoButton: { borderWidth: 1, borderColor: colors.gold, borderStyle: 'dashed', borderRadius: radii.md, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 16, alignItems: 'center', backgroundColor: colors.glass },
+  demoButtonActive: { backgroundColor: colors.goldSoft, borderStyle: 'solid' },
+  demoButtonText: { color: colors.gold, fontWeight: '700', fontSize: 14 },
+  demoButtonTextActive: { color: colors.gold },
+  error: { color: colors.danger, marginBottom: 8 },
+  info: { color: colors.teal, marginBottom: 8 },
   linkButton: { marginTop: 10 },
-  link: { textAlign: 'center', marginTop: 18, color: '#ff6b35', fontWeight: '600' },
+  link: { textAlign: 'center', marginTop: 18, color: colors.teal, fontWeight: '600' },
 });

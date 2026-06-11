@@ -53,7 +53,7 @@ export function ChaseMap({ center, markers }: ChaseMapProps) {
         showsUserLocation={permissionRequested}
         followsUserLocation={permissionRequested}
       >
-        <Marker coordinate={center} title="Zone de chasse" description="Point de départ ou zone de référence" pinColor="#ff6b35" />
+        <Marker coordinate={center} title="Zone de chasse" description="Point de départ ou zone de référence" pinColor="#d4af37" />
         {markers.map((marker, index) => (
           <Marker key={`${marker.title}-${index}`} coordinate={marker} title={marker.title} description={marker.description} />
         ))}
@@ -66,7 +66,7 @@ export function ChaseMap({ center, markers }: ChaseMapProps) {
       </View>
       {!permissionRequested && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator color="#ff6b35" />
+          <ActivityIndicator color="#d4af37" />
         </View>
       )}
     </View>

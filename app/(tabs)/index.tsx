@@ -1,109 +1,324 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@/src/state/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import { useHunts } from '@/src/state/HuntsContext';
+import { useDemo } from '@/src/state/DemoContext';
+import { PlayerCharacter } from '@/src/components/PlayerCharacter';
+import { colors, darkMapStyle, glassStrongCard, radii } from '@/src/theme';
+import { bearingDegrees, formatDistance, haversineDistanceMeters, smoothPosition, type GeoPoint } from '@/src/lib/geo';
 import { playerStats } from '@/src/data/mock';
 
-export default function HomeScreen() {
-  const router = useRouter();
-  const { user } = useAuth();
-  const [chases, setChases] = useState<Chase[]>([]);
+// Position de repli (zone des chasses mock à San Francisco) quand le GPS est
+// indisponible — notamment en mode démo sur simulateur.
+const FALLBACK_POSITION: GeoPoint = { latitude: 37.8044, longitude: -122.2712 };
+const WALK_THRESHOLD_METERS = 1.5;
 
+export default function MapScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { demoMode } = useDemo();
+  const { avatarModel, acceptedHunts, acceptHunt, isAccepted } = useHunts();
+
+  const mapRef = useRef<MapView>(null);
+  const [hunts, setHunts] = useState<Chase[]>([]);
+  const [position, setPosition] = useState<GeoPoint | null>(null);
+  const [walking, setWalking] = useState(false);
+  const [heading, setHeading] = useState<number | null>(null);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [selectedHunt, setSelectedHunt] = useState<Chase | null>(null);
+  const sheetAnim = useRef(new Animated.Value(0)).current;
+  const lastPosition = useRef<GeoPoint | null>(null);
+  const walkingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Chargement des chasses (API → fallback mock géré par chase-api).
   useEffect(() => {
-    (async () => {
-      setChases(await chaseApi.getChases());
-    })();
+    chaseApi.getChases().then(setHunts).catch(() => setHunts([]));
   }, []);
 
-  const activeChase = chases[0];
+  // Suivi GPS continu avec lissage. La caméra suit le joueur : le personnage
+  // reste au centre de l'écran et la carte défile sous lui (pattern Pokémon GO).
+  useEffect(() => {
+    let subscription: Location.LocationSubscription | null = null;
+
+    (async () => {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!permission.granted) {
+        setPermissionDenied(true);
+        if (demoMode) {
+          setPosition(FALLBACK_POSITION);
+        }
+        return;
+      }
+
+      subscription = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, distanceInterval: 2, timeInterval: 1500 },
+        (update) => {
+          const raw: GeoPoint = {
+            latitude: update.coords.latitude,
+            longitude: update.coords.longitude,
+          };
+          const smoothed = smoothPosition(lastPosition.current, raw);
+
+          if (lastPosition.current) {
+            const moved = haversineDistanceMeters(lastPosition.current, smoothed);
+            if (moved > WALK_THRESHOLD_METERS) {
+              setWalking(true);
+              setHeading(
+                update.coords.heading != null && update.coords.heading >= 0
+                  ? update.coords.heading
+                  : bearingDegrees(lastPosition.current, smoothed)
+              );
+              if (walkingTimeout.current) {
+                clearTimeout(walkingTimeout.current);
+              }
+              // Repasse en idle si plus aucun mouvement pendant 3 s.
+              walkingTimeout.current = setTimeout(() => setWalking(false), 3000);
+            }
+          }
+
+          lastPosition.current = smoothed;
+          setPosition(smoothed);
+          mapRef.current?.animateCamera({ center: smoothed }, { duration: 800 });
+        }
+      );
+    })();
+
+    return () => {
+      subscription?.remove();
+      if (walkingTimeout.current) {
+        clearTimeout(walkingTimeout.current);
+      }
+    };
+  }, [demoMode]);
+
+  const effectivePosition = position ?? (demoMode ? FALLBACK_POSITION : null);
+
+  const huntsWithDistance = useMemo(
+    () =>
+      hunts.map((hunt) => ({
+        hunt,
+        distance: effectivePosition ? haversineDistanceMeters(effectivePosition, hunt.location) : null,
+      })),
+    [hunts, effectivePosition]
+  );
+
+  const inProgressCount = Object.keys(acceptedHunts).length;
+
+  const openSheet = (hunt: Chase) => {
+    setSelectedHunt(hunt);
+    Animated.spring(sheetAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start();
+  };
+
+  const closeSheet = () => {
+    Animated.timing(sheetAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() =>
+      setSelectedHunt(null)
+    );
+  };
+
+  const handleAccept = async () => {
+    if (!selectedHunt) {
+      return;
+    }
+    await acceptHunt(selectedHunt.id);
+  };
+
+  const selectedDistance =
+    selectedHunt && effectivePosition
+      ? haversineDistanceMeters(effectivePosition, selectedHunt.location)
+      : null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 28 }}>
-      <LinearGradient colors={['#ff6b35', '#ff8c5a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
-        <Text style={styles.kicker}>Lootopia Mobile</Text>
-        <Text style={styles.title}>Bienvenue {user?.username ?? 'joueur'}</Text>
-        <Text style={styles.subtitle}>Lance une chasse, suis ta progression et garde l’essentiel dans ta poche.</Text>
+    <View style={styles.container}>
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_DEFAULT}
+        style={StyleSheet.absoluteFill}
+        customMapStyle={darkMapStyle}
+        initialRegion={{
+          ...(effectivePosition ?? FALLBACK_POSITION),
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        }}
+        showsUserLocation={false}
+        rotateEnabled={false}
+        pitchEnabled={false}
+        onPress={closeSheet}
+      >
+        {huntsWithDistance.map(({ hunt, distance }) => (
+          <Marker
+            key={hunt.id}
+            coordinate={hunt.location}
+            onPress={() => openSheet(hunt)}
+            tracksViewChanges={false}
+          >
+            <View style={styles.huntMarker}>
+              <Text style={styles.huntMarkerIcon}>{isAccepted(hunt.id) ? '🎯' : '🧰'}</Text>
+              {distance !== null && (
+                <View style={styles.huntMarkerBadge}>
+                  <Text style={styles.huntMarkerBadgeText}>{formatDistance(distance)}</Text>
+                </View>
+              )}
+            </View>
+          </Marker>
+        ))}
+      </MapView>
 
-        <View style={styles.heroStats}>
-          <View style={styles.heroStatCard}>
-            <Text style={styles.heroStatValue}>{playerStats.points}</Text>
-            <Text style={styles.heroStatLabel}>Points</Text>
-          </View>
-          <View style={styles.heroStatCard}>
-            <Text style={styles.heroStatValue}>{playerStats.level}</Text>
-            <Text style={styles.heroStatLabel}>Niveau</Text>
-          </View>
-          <View style={styles.heroStatCard}>
-            <Text style={styles.heroStatValue}>{playerStats.completedChases}</Text>
-            <Text style={styles.heroStatLabel}>Terminées</Text>
-          </View>
+      {/* Personnage : fixe au centre de l'écran, la carte défile sous lui. */}
+      {effectivePosition && (
+        <View pointerEvents="none" style={styles.characterAnchor}>
+          <PlayerCharacter model={avatarModel} walking={walking} headingDegrees={heading} />
         </View>
-      </LinearGradient>
-
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Reprendre rapidement</Text>
-        <Pressable onPress={() => router.push('/(tabs)/chases')}>
-          <Text style={styles.sectionAction}>Voir tout</Text>
-        </Pressable>
-      </View>
-
-      {activeChase && (
-        <Pressable style={styles.quickCard} onPress={() => router.push(`/chases/${activeChase.id}`)}>
-          <View style={styles.quickCardTop}>
-            <Ionicons name="compass-outline" size={22} color="#ff6b35" />
-            <Text style={styles.quickCardBadge}>{activeChase.difficulty}</Text>
-          </View>
-          <Text style={styles.quickCardTitle}>{activeChase.title}</Text>
-          <Text style={styles.quickCardText}>{activeChase.description}</Text>
-          <Text style={styles.quickCardMeta}>{activeChase.estimatedDuration} min · {activeChase.partner.name}</Text>
-        </Pressable>
       )}
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Accès rapide</Text>
+      {/* HUD niveau / points */}
+      <View style={[styles.hud, { top: insets.top + 10 }]}>
+        <View style={styles.hudPill}>
+          <Text style={styles.hudGold}>⭐ Niv. {playerStats.level}</Text>
+        </View>
+        <View style={styles.hudPill}>
+          <Text style={styles.hudTeal}>{playerStats.points} pts</Text>
+        </View>
       </View>
 
-      <View style={styles.grid}>
-        <Pressable style={styles.actionCard} onPress={() => router.push('/(tabs)/chases')}>
-          <Ionicons name="map-outline" size={28} color="#ff6b35" />
-          <Text style={styles.actionTitle}>Chasses</Text>
-        </Pressable>
-        <Pressable style={styles.actionCard} onPress={() => router.push('/(tabs)/progress')}>
-          <Ionicons name="trophy-outline" size={28} color="#ff6b35" />
-          <Text style={styles.actionTitle}>Progression</Text>
-        </Pressable>
-        <Pressable style={styles.actionCard} onPress={() => router.push('/(tabs)/account')}>
-          <Ionicons name="person-circle-outline" size={28} color="#ff6b35" />
-          <Text style={styles.actionTitle}>Compte</Text>
-        </Pressable>
+      {permissionDenied && !demoMode && (
+        <View style={[styles.banner, { top: insets.top + 56 }]}>
+          <Text style={styles.bannerText}>
+            Localisation refusée — active-la dans les réglages, ou utilise le mode démo.
+          </Text>
+        </View>
+      )}
+
+      {/* Boutons flottants */}
+      <View style={[styles.fabRow, { bottom: insets.bottom + 14 }]}>
+        <Fab icon="person-circle-outline" label="Profil" onPress={() => router.push('/(tabs)/account')} />
+        <Fab
+          icon="flag-outline"
+          label="En cours"
+          count={inProgressCount}
+          onPress={() => router.push('/(tabs)/in-progress')}
+        />
+        <Fab icon="map-outline" label="Disponibles" onPress={() => router.push('/(tabs)/chases')} />
       </View>
-    </ScrollView>
+
+      {/* Bottom sheet de détail */}
+      {selectedHunt && (
+        <Animated.View
+          style={[
+            styles.sheet,
+            { paddingBottom: insets.bottom + 16 },
+            {
+              transform: [
+                {
+                  translateY: sheetAnim.interpolate({ inputRange: [0, 1], outputRange: [320, 0] }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.sheetGrab} />
+          <Text style={styles.sheetTitle}>{selectedHunt.title}</Text>
+          <View style={styles.sheetMeta}>
+            <Chip label={selectedHunt.difficulty === 'easy' ? 'Facile' : selectedHunt.difficulty === 'hard' ? 'Difficile' : 'Moyenne'} />
+            <Chip label={`🏆 ${selectedHunt.steps.reduce((sum, step) => sum + (step.reward ?? 0), 0)} pts`} gold />
+            {selectedDistance !== null && <Chip label={`📍 ${formatDistance(selectedDistance)}`} teal />}
+          </View>
+          <Text style={styles.sheetDescription} numberOfLines={3}>
+            {selectedHunt.description}
+          </Text>
+          {isAccepted(selectedHunt.id) ? (
+            <Pressable
+              style={[styles.cta, styles.ctaAccepted]}
+              onPress={() => router.push(`/chases/${selectedHunt.id}`)}
+            >
+              <Text style={styles.ctaAcceptedText}>En cours ✓ — voir le détail</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.cta} onPress={handleAccept}>
+              <Text style={styles.ctaText}>Accepter la chasse</Text>
+            </Pressable>
+          )}
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+function Fab({
+  icon,
+  label,
+  count,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  count?: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.fab} onPress={onPress}>
+      <Ionicons name={icon} size={20} color={colors.foreground} />
+      <Text style={styles.fabLabel}>{label}</Text>
+      {count != null && count > 0 && (
+        <View style={styles.fabBadge}>
+          <Text style={styles.fabBadgeText}>{count}</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function Chip({ label, gold, teal }: { label: string; gold?: boolean; teal?: boolean }) {
+  return (
+    <View
+      style={[
+        styles.chip,
+        gold && { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+        teal && { borderColor: colors.teal, backgroundColor: colors.tealSoft },
+      ]}
+    >
+      <Text style={[styles.chipText, gold && { color: colors.gold }, teal && { color: colors.teal }]}>{label}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff9f5' },
-  hero: { marginTop: 56, marginHorizontal: 16, borderRadius: 28, padding: 20 },
-  kicker: { color: '#fff4ec', fontSize: 12, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
-  title: { color: '#fff', fontSize: 30, fontWeight: '900', marginTop: 8 },
-  subtitle: { color: '#fff7f2', fontSize: 15, lineHeight: 22, marginTop: 8, maxWidth: 320 },
-  heroStats: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  heroStatCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 20, paddingVertical: 14, alignItems: 'center' },
-  heroStatValue: { color: '#fff', fontSize: 24, fontWeight: '900' },
-  heroStatLabel: { color: '#fff7f2', marginTop: 4, fontSize: 12, fontWeight: '700' },
-  sectionHeader: { marginHorizontal: 16, marginTop: 22, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontSize: 18, fontWeight: '900', color: '#1f2937' },
-  sectionAction: { color: '#ff6b35', fontWeight: '700' },
-  quickCard: { backgroundColor: '#fff', marginHorizontal: 16, borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#f2ddd2' },
-  quickCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  quickCardBadge: { backgroundColor: '#fff4ec', color: '#ff6b35', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  quickCardTitle: { fontSize: 20, fontWeight: '900', color: '#111827', marginTop: 14 },
-  quickCardText: { color: '#6b7280', marginTop: 6, lineHeight: 21 },
-  quickCardMeta: { color: '#ff6b35', marginTop: 8, fontWeight: '700' },
-  grid: { marginHorizontal: 16, flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-  actionCard: { width: '31.7%', minWidth: 100, backgroundColor: '#fff', borderRadius: 22, paddingVertical: 18, alignItems: 'center', borderWidth: 1, borderColor: '#f2ddd2' },
-  actionTitle: { marginTop: 10, fontWeight: '800', color: '#111827', fontSize: 13 },
+  container: { flex: 1, backgroundColor: colors.background },
+  characterAnchor: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Décale légèrement vers le haut : les pieds du personnage "touchent" la position GPS.
+    paddingBottom: 64,
+  },
+  hud: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', justifyContent: 'space-between' },
+  hudPill: { ...glassStrongCard, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: 'rgba(11,15,26,0.82)' },
+  hudGold: { color: colors.gold, fontWeight: '800', fontSize: 13 },
+  hudTeal: { color: colors.teal, fontWeight: '800', fontSize: 13 },
+  banner: { position: 'absolute', left: 14, right: 14, backgroundColor: 'rgba(11,15,26,0.92)', borderColor: colors.danger, borderWidth: 1, borderRadius: radii.md, padding: 10 },
+  bannerText: { color: colors.foreground, fontSize: 12, lineHeight: 17 },
+  huntMarker: { alignItems: 'center' },
+  huntMarkerIcon: { fontSize: 30, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  huntMarkerBadge: { backgroundColor: 'rgba(11,15,26,0.9)', borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 7, paddingVertical: 2, marginTop: 2 },
+  huntMarkerBadgeText: { color: colors.foreground, fontSize: 9, fontWeight: '800' },
+  fabRow: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', gap: 10 },
+  fab: { flex: 1, ...glassStrongCard, backgroundColor: 'rgba(11,15,26,0.88)', borderRadius: radii.lg, alignItems: 'center', paddingVertical: 10 },
+  fabLabel: { color: colors.foreground, fontSize: 10, fontWeight: '800', marginTop: 3 },
+  fabBadge: { position: 'absolute', top: 6, right: 14, backgroundColor: colors.gold, borderRadius: radii.pill, minWidth: 18, paddingHorizontal: 4, paddingVertical: 1, alignItems: 'center' },
+  fabBadgeText: { color: colors.background, fontSize: 10, fontWeight: '900' },
+  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(13,18,30,0.97)', borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl, borderColor: colors.glassBorderStrong, borderWidth: 1, padding: 18 },
+  sheetGrab: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.glassBorderStrong, alignSelf: 'center', marginBottom: 12 },
+  sheetTitle: { color: colors.foreground, fontSize: 19, fontWeight: '900' },
+  sheetMeta: { flexDirection: 'row', gap: 8, marginVertical: 10 },
+  chip: { borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.glass },
+  chipText: { color: colors.foreground, fontSize: 11, fontWeight: '700' },
+  sheetDescription: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  cta: { backgroundColor: colors.gold, borderRadius: radii.md, alignItems: 'center', paddingVertical: 13 },
+  ctaText: { color: colors.background, fontWeight: '900', fontSize: 15 },
+  ctaAccepted: { backgroundColor: colors.tealSoft, borderColor: colors.teal, borderWidth: 1 },
+  ctaAcceptedText: { color: colors.teal, fontWeight: '900', fontSize: 15 },
 });

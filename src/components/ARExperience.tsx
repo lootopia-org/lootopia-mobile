@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useDemo } from '@/src/state/DemoContext';
+import { colors, glassCard, radii } from '@/src/theme';
 
 type ARExperienceProps = {
   clue: string;
@@ -91,7 +92,7 @@ export function ARExperience({ clue, targetLocation, radiusMeters, onComplete }:
   if (!permission) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#ff6b35" />
+        <ActivityIndicator color={colors.gold} />
       </View>
     );
   }
@@ -132,18 +133,18 @@ export function ARExperience({ clue, targetLocation, radiusMeters, onComplete }:
 }
 
 const styles = StyleSheet.create({
-  wrapper: { height: 420, borderRadius: 28, overflow: 'hidden', backgroundColor: '#111827' },
-  overlay: { flex: 1, justifyContent: 'flex-end', padding: 18, backgroundColor: 'rgba(17,24,39,0.28)' },
-  kicker: { color: '#fde68a', fontWeight: '900', fontSize: 12, letterSpacing: 1.2 },
-  title: { color: '#fff', fontWeight: '900', fontSize: 24, marginTop: 6 },
-  text: { color: '#f3f4f6', marginTop: 10, lineHeight: 21 },
-  statusText: { color: '#fff', marginTop: 8, fontWeight: '700' },
-  helperText: { color: '#e5e7eb', marginTop: 10, lineHeight: 20 },
-  button: { marginTop: 16, alignSelf: 'flex-start', backgroundColor: '#ff6b35', paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16 },
+  wrapper: { height: 420, borderRadius: radii.xl, overflow: 'hidden', backgroundColor: colors.background, borderColor: colors.glassBorder, borderWidth: 1 },
+  overlay: { flex: 1, justifyContent: 'flex-end', padding: 18, backgroundColor: 'rgba(11,15,26,0.35)' },
+  kicker: { color: colors.gold, fontWeight: '900', fontSize: 12, letterSpacing: 1.2 },
+  title: { color: colors.foreground, fontWeight: '900', fontSize: 24, marginTop: 6 },
+  text: { color: colors.foreground, marginTop: 10, lineHeight: 21 },
+  statusText: { color: colors.teal, marginTop: 8, fontWeight: '700' },
+  helperText: { color: colors.textMuted, marginTop: 10, lineHeight: 20 },
+  button: { marginTop: 16, alignSelf: 'flex-start', backgroundColor: colors.gold, paddingHorizontal: 16, paddingVertical: 14, borderRadius: radii.md },
   buttonDisabled: { opacity: 0.55 },
-  buttonText: { color: '#fff', fontWeight: '800' },
-  permissionCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f2ddd2', padding: 18, borderRadius: 24 },
-  permissionTitle: { fontSize: 18, fontWeight: '900', color: '#111827' },
-  permissionText: { color: '#6b7280', marginTop: 8, lineHeight: 21 },
+  buttonText: { color: colors.background, fontWeight: '900' },
+  permissionCard: { ...glassCard, padding: 18 },
+  permissionTitle: { fontSize: 18, fontWeight: '900', color: colors.foreground },
+  permissionText: { color: colors.textMuted, marginTop: 8, lineHeight: 21 },
   center: { height: 280, alignItems: 'center', justifyContent: 'center' },
 });

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '@/src/state/AuthContext';
+import { colors, glassCard, radii } from '@/src/theme';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -30,8 +31,8 @@ export default function RegisterScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Créer un compte joueur</Text>
-      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" />
-      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" secureTextEntry />
+      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.textFaint} autoCapitalize="none" />
+      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" placeholderTextColor={colors.textFaint} secureTextEntry />
 
       {error && <Text style={styles.error}>{error}</Text>}
       {info && <Text style={styles.info}>{info}</Text>}
@@ -48,13 +49,13 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#fff9f5' },
-  title: { fontSize: 28, fontWeight: '800', color: '#1f2937', marginBottom: 18 },
-  input: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#f2ddd2' },
-  button: { backgroundColor: '#1f2937', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 8 },
+  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.background },
+  title: { fontSize: 28, fontWeight: '900', color: colors.foreground, marginBottom: 18 },
+  input: { ...glassCard, borderRadius: radii.md, padding: 16, marginBottom: 12, color: colors.foreground },
+  button: { backgroundColor: colors.gold, paddingVertical: 16, borderRadius: radii.md, alignItems: 'center', marginTop: 8 },
   buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  error: { color: '#b91c1c', marginBottom: 8 },
-  info: { color: '#075985', marginBottom: 8 },
-  link: { textAlign: 'center', marginTop: 18, color: '#ff6b35', fontWeight: '600' },
+  buttonText: { color: colors.background, fontWeight: '900', fontSize: 16 },
+  error: { color: colors.danger, marginBottom: 8 },
+  info: { color: colors.teal, marginBottom: 8 },
+  link: { textAlign: 'center', marginTop: 18, color: colors.teal, fontWeight: '600' },
 });

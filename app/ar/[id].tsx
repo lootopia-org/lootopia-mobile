@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ARExperience } from '@/src/components/ARExperience';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import { colors, glassCard, radii } from '@/src/theme';
 
 export default function ARScreen() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function ARScreen() {
   if (isLoading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#ff6b35" />
+        <ActivityIndicator color={colors.gold} />
       </View>
     );
   }
@@ -48,7 +49,7 @@ export default function ARScreen() {
   if (!chase) {
     return (
       <View style={styles.center}>
-        <Text>Chasse introuvable.</Text>
+        <Text style={styles.notFoundText}>Chasse introuvable.</Text>
       </View>
     );
   }
@@ -76,13 +77,14 @@ export default function ARScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff9f5', paddingHorizontal: 16 },
-  header: { fontSize: 28, fontWeight: '900', color: '#1f2937', marginTop: 64 },
-  subheader: { color: '#6b7280', marginTop: 4, marginBottom: 14 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f2ddd2', borderRadius: 24, padding: 18, marginBottom: 14 },
-  cardTitle: { fontSize: 16, fontWeight: '800', color: '#111827' },
-  cardText: { color: '#6b7280', marginTop: 8, lineHeight: 21 },
-  backButton: { marginTop: 14, backgroundColor: '#1f2937', paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
-  backButtonText: { color: '#fff', fontWeight: '800' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 16 },
+  header: { fontSize: 28, fontWeight: '900', color: colors.foreground, marginTop: 64 },
+  subheader: { color: colors.textMuted, marginTop: 4, marginBottom: 14 },
+  card: { ...glassCard, padding: 18, marginBottom: 14 },
+  cardTitle: { fontSize: 16, fontWeight: '800', color: colors.foreground },
+  cardText: { color: colors.textMuted, marginTop: 8, lineHeight: 21 },
+  backButton: { ...glassCard, borderRadius: radii.md, marginTop: 14, paddingVertical: 16, alignItems: 'center' },
+  backButtonText: { color: colors.foreground, fontWeight: '800' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  notFoundText: { color: colors.textMuted, fontWeight: '700' },
 });
