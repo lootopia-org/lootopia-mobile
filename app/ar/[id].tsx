@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ARExperience } from '@/src/components/ARExperience';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
-import { colors, glassCard, radii } from '@/src/theme';
+import { colors, radii } from '@/src/theme';
 
 export default function ARScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id, clue, stepId } = useLocalSearchParams<{ id: string; clue?: string; stepId?: string }>();
   const [chase, setChase] = useState<Chase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,12 +33,11 @@ export default function ARScreen() {
 
   const handleComplete = async () => {
     if (!chase || !step) {
-      router.back();
       return;
     }
-
+    // On valide côté API mais on reste sur l'écran : le joueur voit le coffre
+    // s'ouvrir, puis revient avec le bouton retour.
     await chaseApi.completeStep(chase.id, step.id);
-    router.back();
   };
 
   if (isLoading) {
@@ -55,37 +57,61 @@ export default function ARScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 28 }}>
-      <Text style={styles.header}>AR</Text>
-      <Text style={styles.subheader}>{chase.title}</Text>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Indice à révéler</Text>
-        <Text style={styles.cardText}>{step?.arHint ?? clue ?? 'Utilise la caméra pour révéler l’indice de la chasse.'}</Text>
-      </View>
-
+    <View style={styles.container}>
+      {/* L'expérience AR occupe tout l'écran. */}
       <ARExperience
         clue={step?.clue ?? clue ?? 'Indice indisponible'}
         targetLocation={step?.location ?? { latitude: 43.2965, longitude: 5.3698 }}
         radiusMeters={step?.radiusMeters ?? 100}
         qrPayload={step?.qrPayload}
+        fullScreen
         onComplete={handleComplete}
       />
-      <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <Text style={styles.backButtonText}>Retour à la chasse</Text>
-      </Pressable>
-    </ScrollView>
+
+      {/* En-tête superposé : retour + contexte de l'étape. */}
+      <View style={[styles.topBar, { top: insets.top + 10 }]} pointerEvents="box-none">
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={20} color={colors.foreground} />
+        </Pressable>
+        <View style={styles.titlePill}>
+          <Text style={styles.titleText} numberOfLines={1}>
+            {chase.title}
+          </Text>
+          {step && (
+            <Text style={styles.stepText} numberOfLines={1}>
+              {step.title}
+            </Text>
+          )}
+        </View>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 16 },
-  header: { fontSize: 28, fontWeight: '900', color: colors.foreground, marginTop: 64 },
-  subheader: { color: colors.textMuted, marginTop: 4, marginBottom: 14 },
-  card: { ...glassCard, padding: 18, marginBottom: 14 },
-  cardTitle: { fontSize: 16, fontWeight: '800', color: colors.foreground },
-  cardText: { color: colors.textMuted, marginTop: 8, lineHeight: 21 },
-  backButton: { ...glassCard, borderRadius: radii.md, marginTop: 14, paddingVertical: 16, alignItems: 'center' },
-  backButtonText: { color: colors.foreground, fontWeight: '800' },
+  container: { flex: 1, backgroundColor: colors.background },
+  topBar: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: 'rgba(11,15,26,0.85)',
+    borderColor: colors.glassBorderStrong,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titlePill: {
+    flex: 1,
+    backgroundColor: 'rgba(11,15,26,0.85)',
+    borderColor: colors.glassBorderStrong,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  titleText: { color: colors.foreground, fontWeight: '900', fontSize: 13 },
+  stepText: { color: colors.gold, fontWeight: '700', fontSize: 11, marginTop: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   notFoundText: { color: colors.textMuted, fontWeight: '700' },
 });

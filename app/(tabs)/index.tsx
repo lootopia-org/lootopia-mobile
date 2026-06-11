@@ -3,7 +3,6 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
 import { useHunts } from '@/src/state/HuntsContext';
@@ -22,7 +21,7 @@ export default function MapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { demoMode } = useDemo();
-  const { avatarModel, acceptedHunts, acceptHunt, isAccepted } = useHunts();
+  const { avatarModel, acceptHunt, isAccepted } = useHunts();
 
   const mapRef = useRef<MapView>(null);
   const [hunts, setHunts] = useState<Chase[]>([]);
@@ -109,8 +108,6 @@ export default function MapScreen() {
       })),
     [hunts, effectivePosition]
   );
-
-  const inProgressCount = Object.keys(acceptedHunts).length;
 
   // Alerte de proximité in-app : prévenir (une seule fois par chasse) quand une
   // chasse non acceptée entre dans le rayon de découverte. Remplacera une vraie
@@ -237,18 +234,6 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Boutons flottants */}
-      <View style={[styles.fabRow, { bottom: insets.bottom + 14 }]}>
-        <Fab icon="person-circle-outline" label="Profil" onPress={() => router.push('/(tabs)/account')} />
-        <Fab
-          icon="flag-outline"
-          label="En cours"
-          count={inProgressCount}
-          onPress={() => router.push('/(tabs)/in-progress')}
-        />
-        <Fab icon="map-outline" label="Disponibles" onPress={() => router.push('/(tabs)/chases')} />
-      </View>
-
       {/* Bottom sheet de détail */}
       {selectedHunt && (
         <Animated.View
@@ -292,30 +277,6 @@ export default function MapScreen() {
   );
 }
 
-function Fab({
-  icon,
-  label,
-  count,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  count?: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={styles.fab} onPress={onPress}>
-      <Ionicons name={icon} size={20} color={colors.foreground} />
-      <Text style={styles.fabLabel}>{label}</Text>
-      {count != null && count > 0 && (
-        <View style={styles.fabBadge}>
-          <Text style={styles.fabBadgeText}>{count}</Text>
-        </View>
-      )}
-    </Pressable>
-  );
-}
-
 function Chip({ label, gold, teal }: { label: string; gold?: boolean; teal?: boolean }) {
   return (
     <View
@@ -352,11 +313,6 @@ const styles = StyleSheet.create({
   huntMarkerIcon: { fontSize: 30, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   huntMarkerBadge: { backgroundColor: 'rgba(11,15,26,0.9)', borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 7, paddingVertical: 2, marginTop: 2 },
   huntMarkerBadgeText: { color: colors.foreground, fontSize: 9, fontWeight: '800' },
-  fabRow: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', gap: 10 },
-  fab: { flex: 1, ...glassStrongCard, backgroundColor: 'rgba(11,15,26,0.88)', borderRadius: radii.lg, alignItems: 'center', paddingVertical: 10 },
-  fabLabel: { color: colors.foreground, fontSize: 10, fontWeight: '800', marginTop: 3 },
-  fabBadge: { position: 'absolute', top: 6, right: 14, backgroundColor: colors.gold, borderRadius: radii.pill, minWidth: 18, paddingHorizontal: 4, paddingVertical: 1, alignItems: 'center' },
-  fabBadgeText: { color: colors.background, fontSize: 10, fontWeight: '900' },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(13,18,30,0.97)', borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl, borderColor: colors.glassBorderStrong, borderWidth: 1, padding: 18 },
   sheetGrab: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.glassBorderStrong, alignSelf: 'center', marginBottom: 12 },
   sheetTitle: { color: colors.foreground, fontSize: 19, fontWeight: '900' },

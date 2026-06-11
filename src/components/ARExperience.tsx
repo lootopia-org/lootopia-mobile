@@ -19,6 +19,8 @@ type ARExperienceProps = {
   radiusMeters: number;
   // Contenu attendu d'un QR code physique validant l'étape (alternative au GPS).
   qrPayload?: string;
+  // Occupe tout l'écran (vue AR immersive) au lieu d'une carte de 460 px.
+  fullScreen?: boolean;
   onComplete?: () => void;
 };
 
@@ -32,7 +34,7 @@ type ARExperienceProps = {
  * Le vrai ancrage ARKit/ARCore (ViroReact + dev build) remplacera la
  * superposition fixe sans changer cette interface.
  */
-export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, onComplete }: ARExperienceProps) {
+export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, fullScreen = false, onComplete }: ARExperienceProps) {
   const { demoMode } = useDemo();
   const [permission, requestPermission] = useCameraPermissions();
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
@@ -182,7 +184,7 @@ export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, on
   }
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, fullScreen && styles.wrapperFullScreen]}>
       <CameraView
         style={StyleSheet.absoluteFill}
         facing="back"
@@ -221,6 +223,7 @@ export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, on
 
 const styles = StyleSheet.create({
   wrapper: { height: 460, borderRadius: radii.xl, overflow: 'hidden', backgroundColor: colors.background, borderColor: colors.glassBorder, borderWidth: 1 },
+  wrapperFullScreen: { flex: 1, height: undefined, borderRadius: 0, borderWidth: 0 },
   chestAnchor: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingBottom: 120 },
   chestCanvas: { width: 200, height: 200 },
   overlay: { flex: 1, justifyContent: 'flex-end', padding: 18, backgroundColor: 'rgba(11,15,26,0.35)' },
