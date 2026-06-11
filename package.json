@@ -9,7 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "check-budgets": "node scripts/check-budgets.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

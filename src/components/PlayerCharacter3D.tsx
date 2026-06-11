@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { colors } from '@/src/theme';
 import type { AvatarModel } from '@/src/state/HuntsContext';
 import { buildCharacter } from '@/src/components/three/buildCharacter';
+import { createFrameLimiter, useAppActiveRef } from '@/src/hooks/useAppActiveRef';
+import { recordFrame } from '@/src/lib/perf';
 
 type PlayerCharacter3DProps = {
   model: AvatarModel;
@@ -34,6 +36,7 @@ export function PlayerCharacter3D({
   const walkingRef = useRef(walking);
   const headingRef = useRef(headingDegrees ?? 0);
   const frameRef = useRef<number | null>(null);
+  const appActiveRef = useAppActiveRef();
 
   useEffect(() => {
     walkingRef.current = walking;
@@ -76,10 +79,22 @@ export function PlayerCharacter3D({
     const rig = buildCharacter(model);
     scene.add(rig.group);
 
+    // Optimisation : 30 fps max (suffisant pour un personnage sur carte) et
+    // aucun rendu quand l'app est en arrière-plan. Le temps est basé sur
+    // l'horloge réelle pour que la vitesse d'animation reste constante.
     let t = 0;
+    let lastTick = Date.now();
+    const shouldRender = createFrameLimiter(30);
+
     const renderLoop = () => {
       frameRef.current = requestAnimationFrame(renderLoop);
-      t += 1 / 60;
+      if (!appActiveRef.current || !shouldRender()) {
+        return;
+      }
+      const now = Date.now();
+      t += Math.min((now - lastTick) / 1000, 0.1);
+      lastTick = now;
+      recordFrame('character');
 
       const isWalking = walkingRef.current;
 

@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
 import { useHunts } from '@/src/state/HuntsContext';
@@ -11,11 +11,23 @@ import { PlayerCharacter3D } from '@/src/components/PlayerCharacter3D';
 import { colors, darkMapStyle, glassStrongCard, radii } from '@/src/theme';
 import { bearingDegrees, formatDistance, haversineDistanceMeters, smoothPosition, type GeoPoint } from '@/src/lib/geo';
 import { playerStats } from '@/src/data/mock';
+import { getFps } from '@/src/lib/perf';
 
 // Position de repli (zone des chasses mock à San Francisco) quand le GPS est
 // indisponible — notamment en mode démo sur simulateur.
 const FALLBACK_POSITION: GeoPoint = { latitude: 37.8044, longitude: -122.2712 };
 const WALK_THRESHOLD_METERS = 1.5;
+
+// Profils GPS adaptatifs : précision maximale uniquement à proximité d'une
+// chasse ; sinon profil économe (précision Balanced, intervalles espacés).
+// Hystérésis near<400 m / far>600 m pour éviter les bascules en boucle.
+const GPS_PROFILES = {
+  near: { accuracy: Location.Accuracy.High, distanceInterval: 2, timeInterval: 1500 },
+  far: { accuracy: Location.Accuracy.Balanced, distanceInterval: 10, timeInterval: 5000 },
+} as const;
+type GpsProfile = keyof typeof GPS_PROFILES;
+const NEAR_ENTER_METERS = 400;
+const NEAR_EXIT_METERS = 600;
 
 export default function MapScreen() {
   const router = useRouter();
@@ -31,6 +43,16 @@ export default function MapScreen() {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [selectedHunt, setSelectedHunt] = useState<Chase | null>(null);
   const [proximityAlert, setProximityAlert] = useState<string | null>(null);
+  const [fps, setFps] = useState(0);
+
+  // Moniteur FPS visible uniquement en mode démo (télémétrie de dev).
+  useEffect(() => {
+    if (!demoMode) {
+      return;
+    }
+    const interval = setInterval(() => setFps(getFps('character')), 1000);
+    return () => clearInterval(interval);
+  }, [demoMode]);
   const sheetAnim = useRef(new Animated.Value(0)).current;
   const lastPosition = useRef<GeoPoint | null>(null);
   const walkingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -38,65 +60,98 @@ export default function MapScreen() {
   const proximityTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Chargement des chasses (API → fallback mock géré par chase-api).
+  const huntsRef = useRef<Chase[]>([]);
   useEffect(() => {
     chaseApi.getChases().then(setHunts).catch(() => setHunts([]));
   }, []);
-
-  // Suivi GPS continu avec lissage. La caméra suit le joueur : le personnage
-  // reste au centre de l'écran et la carte défile sous lui (pattern Pokémon GO).
   useEffect(() => {
-    let subscription: Location.LocationSubscription | null = null;
+    huntsRef.current = hunts;
+  }, [hunts]);
 
-    (async () => {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (!permission.granted) {
-        setPermissionDenied(true);
-        if (demoMode) {
-          setPosition(FALLBACK_POSITION);
-        }
-        return;
-      }
+  const gpsProfileRef = useRef<GpsProfile>('near');
+  const gpsSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
-      subscription = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, distanceInterval: 2, timeInterval: 1500 },
-        (update) => {
-          const raw: GeoPoint = {
-            latitude: update.coords.latitude,
-            longitude: update.coords.longitude,
-          };
-          const smoothed = smoothPosition(lastPosition.current, raw);
-
-          if (lastPosition.current) {
-            const moved = haversineDistanceMeters(lastPosition.current, smoothed);
-            if (moved > WALK_THRESHOLD_METERS) {
-              setWalking(true);
-              setHeading(
-                update.coords.heading != null && update.coords.heading >= 0
-                  ? update.coords.heading
-                  : bearingDegrees(lastPosition.current, smoothed)
-              );
-              if (walkingTimeout.current) {
-                clearTimeout(walkingTimeout.current);
-              }
-              // Repasse en idle si plus aucun mouvement pendant 3 s.
-              walkingTimeout.current = setTimeout(() => setWalking(false), 3000);
-            }
-          }
-
-          lastPosition.current = smoothed;
-          setPosition(smoothed);
-          mapRef.current?.animateCamera({ center: smoothed }, { duration: 800 });
-        }
-      );
-    })();
-
-    return () => {
-      subscription?.remove();
-      if (walkingTimeout.current) {
-        clearTimeout(walkingTimeout.current);
-      }
+  const handlePositionUpdate = useCallback((update: Location.LocationObject) => {
+    const raw: GeoPoint = {
+      latitude: update.coords.latitude,
+      longitude: update.coords.longitude,
     };
-  }, [demoMode]);
+    const smoothed = smoothPosition(lastPosition.current, raw);
+
+    if (lastPosition.current) {
+      const moved = haversineDistanceMeters(lastPosition.current, smoothed);
+      if (moved > WALK_THRESHOLD_METERS) {
+        setWalking(true);
+        setHeading(
+          update.coords.heading != null && update.coords.heading >= 0
+            ? update.coords.heading
+            : bearingDegrees(lastPosition.current, smoothed)
+        );
+        if (walkingTimeout.current) {
+          clearTimeout(walkingTimeout.current);
+        }
+        // Repasse en idle si plus aucun mouvement pendant 3 s.
+        walkingTimeout.current = setTimeout(() => setWalking(false), 3000);
+      }
+    }
+
+    lastPosition.current = smoothed;
+    setPosition(smoothed);
+    mapRef.current?.animateCamera({ center: smoothed }, { duration: 800 });
+
+    // Adaptation du profil GPS à la distance de la chasse la plus proche.
+    const distances = huntsRef.current.map((hunt) => haversineDistanceMeters(smoothed, hunt.location));
+    const nearest = distances.length > 0 ? Math.min(...distances) : Infinity;
+    const current = gpsProfileRef.current;
+    const next: GpsProfile =
+      current === 'near' ? (nearest > NEAR_EXIT_METERS ? 'far' : 'near') : nearest < NEAR_ENTER_METERS ? 'near' : 'far';
+    if (next !== current) {
+      void subscribeGps(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const subscribeGps = useCallback(
+    async (profile: GpsProfile) => {
+      gpsSubscriptionRef.current?.remove();
+      gpsProfileRef.current = profile;
+      gpsSubscriptionRef.current = await Location.watchPositionAsync(GPS_PROFILES[profile], handlePositionUpdate);
+    },
+    [handlePositionUpdate]
+  );
+
+  // Suivi GPS actif uniquement quand l'écran carte a le focus (les autres
+  // onglets n'en ont pas besoin : économie batterie). La caméra suit le
+  // joueur : le personnage reste au centre, la carte défile (pattern Pokémon GO).
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      (async () => {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (cancelled) {
+          return;
+        }
+        if (!permission.granted) {
+          setPermissionDenied(true);
+          if (demoMode) {
+            setPosition(FALLBACK_POSITION);
+          }
+          return;
+        }
+        await subscribeGps(gpsProfileRef.current);
+      })();
+
+      return () => {
+        cancelled = true;
+        gpsSubscriptionRef.current?.remove();
+        gpsSubscriptionRef.current = null;
+        if (walkingTimeout.current) {
+          clearTimeout(walkingTimeout.current);
+        }
+      };
+    }, [demoMode, subscribeGps])
+  );
 
   const effectivePosition = position ?? (demoMode ? FALLBACK_POSITION : null);
 
@@ -217,6 +272,11 @@ export default function MapScreen() {
         <View style={styles.hudPill}>
           <Text style={styles.hudTeal}>{playerStats.points} pts</Text>
         </View>
+        {demoMode && (
+          <View style={styles.hudPill}>
+            <Text style={[styles.hudTeal, fps > 0 && fps < 24 && { color: colors.danger }]}>{fps} fps</Text>
+          </View>
+        )}
       </View>
 
       {permissionDenied && !demoMode && (

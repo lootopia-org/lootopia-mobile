@@ -9,6 +9,8 @@ import { useDemo } from '@/src/state/DemoContext';
 import { colors, glassCard, radii } from '@/src/theme';
 import { haversineDistanceMeters } from '@/src/lib/geo';
 import { buildChest } from '@/src/components/three/buildCharacter';
+import { createFrameLimiter, useAppActiveRef } from '@/src/hooks/useAppActiveRef';
+import { recordFrame } from '@/src/lib/perf';
 
 type ARExperienceProps = {
   clue: string;
@@ -45,6 +47,7 @@ export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, fu
   // Lu par la boucle de rendu GL (pas de re-création de scène sur validation).
   const chestOpenRef = useRef(false);
   const frameRef = useRef<number | null>(null);
+  const appActiveRef = useAppActiveRef();
 
   useEffect(() => {
     if (!permission) {
@@ -144,10 +147,20 @@ export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, fu
     const chest = buildChest();
     scene.add(chest.group);
 
+    // 30 fps max + pause complète en arrière-plan (caméra + GL = gros poste batterie).
     let t = 0;
+    let lastTick = Date.now();
+    const shouldRender = createFrameLimiter(30);
+
     const renderLoop = () => {
       frameRef.current = requestAnimationFrame(renderLoop);
-      t += 1 / 60;
+      if (!appActiveRef.current || !shouldRender()) {
+        return;
+      }
+      const now = Date.now();
+      t += Math.min((now - lastTick) / 1000, 0.1);
+      lastTick = now;
+      recordFrame('ar-chest');
 
       // Présentation : lente rotation + flottement.
       chest.group.rotation.y = Math.sin(t * 0.6) * 0.5;
