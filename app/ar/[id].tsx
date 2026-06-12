@@ -16,7 +16,7 @@ export default function ARScreen() {
   const insets = useSafeAreaInsets();
   const { id, clue, stepId } = useLocalSearchParams<{ id: string; clue?: string; stepId?: string }>();
   const { getStepOverride, isHuntLivePaused } = useLiveOps();
-  const { token, isDemoSession } = useAuth();
+  const { token } = useAuth();
   const { acceptedHunts, completeStep: completeStepLocally } = useHunts();
   const [chase, setChase] = useState<Chase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +52,7 @@ export default function ARScreen() {
     const alreadyDone = acceptedHunts[chase.id]?.completedStepIds ?? [];
     const doneAfter = new Set([...alreadyDone, step.id]);
     const isHuntComplete = chase.steps.every((item) => doneAfter.has(item.id));
-    if (isHuntComplete && token && !isDemoSession) {
+    if (isHuntComplete && token) {
       try {
         await profileApi.completeHunt(token, chase.id);
       } catch {

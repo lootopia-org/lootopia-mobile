@@ -6,6 +6,7 @@ import {
   type WebauthnCredential,
 } from '@/src/lib/auth-api';
 import { useAuth } from '@/src/state/AuthContext';
+import { getTotpStatus, setTotpStatus } from '@/src/lib/totp-status';
 import { colors, glassCard, radii } from '@/src/theme';
 
 /**
@@ -17,9 +18,10 @@ import { colors, glassCard, radii } from '@/src/theme';
  * (L'ajout d'une passkey reste côté web : WebAuthn n'existe pas dans Expo Go.)
  */
 export function SecuritySection() {
-  const { token, isDemoSession } = useAuth();
+  const { token } = useAuth();
 
   const [enrollment, setEnrollment] = useState<TotpEnrollBeginResponse | null>(null);
+  const [totpEnabled, setTotpEnabled] = useState<boolean | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [disableMode, setDisableMode] = useState(false);
   const [credentials, setCredentials] = useState<WebauthnCredential[] | null>(null);
@@ -27,7 +29,7 @@ export function SecuritySection() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const realToken = token && !isDemoSession ? token : null;
+  const realToken = token;
 
   const loadCredentials = useCallback(async () => {
     if (!realToken) {
@@ -45,17 +47,14 @@ export function SecuritySection() {
 
   useEffect(() => {
     void loadCredentials();
+    void getTotpStatus().then(setTotpEnabled);
   }, [loadCredentials]);
 
   if (!realToken) {
     return (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>🔐 Sécurité</Text>
-        <Text style={styles.muted}>
-          {isDemoSession
-            ? 'Indisponible en mode démo — connecte-toi avec un vrai compte pour gérer TOTP et passkeys.'
-            : 'Connecte-toi pour gérer la sécurité de ton compte.'}
-        </Text>
+        <Text style={styles.muted}>Connecte-toi pour gérer la sécurité de ton compte.</Text>
       </View>
     );
   }
@@ -84,6 +83,8 @@ export function SecuritySection() {
       await authApi.verifyTotpEnroll(realToken, totpCode.trim());
       setEnrollment(null);
       setTotpCode('');
+      setTotpEnabled(true);
+      await setTotpStatus(true);
       setMessage('TOTP activé sur ton compte ✓');
     });
 
@@ -92,6 +93,8 @@ export function SecuritySection() {
       await authApi.disableTotp(realToken, totpCode.trim());
       setDisableMode(false);
       setTotpCode('');
+      setTotpEnabled(false);
+      await setTotpStatus(false);
       setMessage('TOTP désactivé.');
     });
 
@@ -100,7 +103,26 @@ export function SecuritySection() {
       <Text style={styles.cardTitle}>🔐 Sécurité</Text>
 
       {/* --- TOTP --- */}
-      <Text style={styles.sectionLabel}>Double authentification (TOTP)</Text>
+      <View style={styles.totpHeader}>
+        <Text style={styles.sectionLabel}>Double authentification (TOTP)</Text>
+        <View
+          style={[
+            styles.statusPill,
+            totpEnabled === true && styles.statusPillOn,
+            totpEnabled === false && styles.statusPillOff,
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusPillText,
+              totpEnabled === true && { color: colors.success },
+              totpEnabled === false && { color: colors.danger },
+            ]}
+          >
+            {totpEnabled === true ? '● Activé' : totpEnabled === false ? '○ Désactivé' : '? Inconnu'}
+          </Text>
+        </View>
+      </View>
 
       {enrollment ? (
         <View style={styles.enrollBox}>
@@ -193,6 +215,11 @@ const styles = StyleSheet.create({
   card: { ...glassCard, padding: 16, marginTop: 12 },
   cardTitle: { color: colors.foreground, fontWeight: '900', fontSize: 16 },
   sectionLabel: { color: colors.gold, fontWeight: '800', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 14, marginBottom: 8 },
+  totpHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  statusPill: { borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 9, paddingVertical: 3, backgroundColor: colors.glass, marginTop: 6 },
+  statusPillOn: { borderColor: colors.success, backgroundColor: 'rgba(52,211,153,0.10)' },
+  statusPillOff: { borderColor: colors.danger, backgroundColor: 'rgba(248,113,113,0.10)' },
+  statusPillText: { color: colors.textMuted, fontSize: 10, fontWeight: '900' },
   muted: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
   enrollBox: { gap: 10 },
   secret: { color: colors.teal, fontWeight: '800', fontSize: 14, letterSpacing: 1.2, backgroundColor: colors.glass, borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.sm, padding: 10, textAlign: 'center' },

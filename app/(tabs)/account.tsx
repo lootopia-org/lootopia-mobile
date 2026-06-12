@@ -7,7 +7,6 @@ import { useHunts, type AvatarModel } from '@/src/state/HuntsContext';
 import { PlayerCharacter3D } from '@/src/components/PlayerCharacter3D';
 import { SecuritySection } from '@/src/components/SecuritySection';
 import { fetchOrCreateProfile, profileApi, type Profile } from '@/src/lib/profile-api';
-import { playerStats } from '@/src/data/mock';
 import { colors, glassCard, glassStrongCard, radii } from '@/src/theme';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -21,14 +20,13 @@ const XP_TARGET = 2000;
 export default function AccountScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, signOut, token, isDemoSession } = useAuth();
+  const { user, signOut, token } = useAuth();
   const { avatarModel, setAvatarModel, acceptedHunts } = useHunts();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Profil serveur (GET /profile, créé via POST au premier passage). En mode
-  // démo ou hors-ligne, on retombe sur les stats mock.
-  const realToken = token && !isDemoSession ? token : null;
+  // Profil serveur (GET /profile, créé via POST au premier passage).
+  const realToken = token;
   useEffect(() => {
     if (!realToken) {
       setProfile(null);
@@ -60,9 +58,9 @@ export default function AccountScreen() {
     }
   };
 
-  const points = profile?.points ?? playerStats.points;
-  const level = profile?.level ?? playerStats.level;
-  const completedHunts = profile?.completedHunts ?? playerStats.completedChases;
+  const points = profile?.points ?? 0;
+  const level = profile?.level ?? 1;
+  const completedHunts = profile?.completedHunts ?? 0;
   const xpRatio = Math.min(points / XP_TARGET, 1);
 
   return (
@@ -89,7 +87,7 @@ export default function AccountScreen() {
         <View style={styles.levelRow}>
           <Text style={styles.levelText}>⭐ Niveau {level}</Text>
           <Text style={styles.xpText}>
-            {points} / {XP_TARGET} XP{profile ? '' : ' · données démo'}
+            {points} / {XP_TARGET} XP{profile ? '' : ' · hors-ligne'}
           </Text>
         </View>
         <View style={styles.xpTrack}>
@@ -102,7 +100,6 @@ export default function AccountScreen() {
         <Stat value={String(points)} label="Points" gold />
         <Stat value={String(completedHunts)} label="Chasses finies" />
         <Stat value={String(Object.keys(acceptedHunts).length)} label="En cours" teal />
-        <Stat value={`${playerStats.progressPercentage}%`} label="Progression" />
       </View>
 
       <SecuritySection />

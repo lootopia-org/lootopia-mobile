@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Linking } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '@/src/state/AuthContext';
-import { useDemo } from '@/src/state/DemoContext';
 import { colors, glassCard, radii } from '@/src/theme';
 
 // Connexion passkey : WebAuthn n'existe pas en natif dans Expo Go, on suit donc
@@ -15,8 +14,7 @@ const PASSKEY_LOGIN_URL = `${WEB_APP_URL}/auth/mobile?redirect_uri=${encodeURICo
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, signInDemo, verifyTotp, clearMfaState, loginStage, pendingMethods, resendVerification } = useAuth();
-  const { demoMode, toggleDemo } = useDemo();
+  const { signIn, verifyTotp, clearMfaState, loginStage, pendingMethods, resendVerification } = useAuth();
   const [email, setEmail] = useState('player@lootopia.app');
   const [password, setPassword] = useState('password');
   const [code, setCode] = useState('');
@@ -72,20 +70,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleDemo = async (role: 'admin' | 'partner' | 'player') => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setInfo(null);
-      await signInDemo(role);
-      router.replace('/(tabs)/chases');
-    } catch {
-      setError('Connexion démo impossible.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleResendVerification = async () => {
     try {
       setIsLoading(true);
@@ -122,68 +106,39 @@ export default function LoginScreen() {
       <Text style={styles.title}>Lootopia Mobile</Text>
       <Text style={styles.subtitle}>Accès joueur pour les chasses, les étapes et le compte.</Text>
 
-      <Pressable
-        style={[styles.demoButton, demoMode && styles.demoButtonActive]}
-        onPress={toggleDemo}
-        accessibilityRole="switch"
-        accessibilityState={{ checked: demoMode }}
-      >
-        <Text style={[styles.demoButtonText, demoMode && styles.demoButtonTextActive]}>
-          {demoMode ? '🧪 Mode démo activé — validation sans GPS' : 'Activer le mode démo (mock)'}
-        </Text>
+      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.textFaint} autoCapitalize="none" />
+
+      {loginStage === 'credentials' ? (
+        <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" placeholderTextColor={colors.textFaint} secureTextEntry />
+      ) : (
+        <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="Code TOTP" placeholderTextColor={colors.textFaint} keyboardType="number-pad" />
+      )}
+
+      {error && <Text style={styles.error}>{error}</Text>}
+      {info && <Text style={styles.info}>{info}</Text>}
+
+      <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
+        <Text style={styles.buttonText}>{loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
       </Pressable>
 
-      {demoMode ? (
-        <View>
-          <Text style={styles.demoHint}>Choisis un profil de démonstration :</Text>
-          {error && <Text style={styles.error}>{error}</Text>}
-          <Pressable style={[styles.roleButton, styles.rolePlayerButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('player')} disabled={isLoading}>
-            <Text style={[styles.roleButtonText, styles.rolePlayerButtonText]}>🎮 Démo Joueur</Text>
-          </Pressable>
-          <Pressable style={[styles.roleButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('partner')} disabled={isLoading}>
-            <Text style={styles.roleButtonText}>🧰 Démo Partenaire (Studio)</Text>
-          </Pressable>
-          <Pressable style={[styles.roleButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('admin')} disabled={isLoading}>
-            <Text style={styles.roleButtonText}>🛡️ Démo Admin (Studio)</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.textFaint} autoCapitalize="none" />
-
-          {loginStage === 'credentials' ? (
-            <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" placeholderTextColor={colors.textFaint} secureTextEntry />
-          ) : (
-            <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="Code TOTP" placeholderTextColor={colors.textFaint} keyboardType="number-pad" />
-          )}
-
-          {error && <Text style={styles.error}>{error}</Text>}
-          {info && <Text style={styles.info}>{info}</Text>}
-
-          <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
-            <Text style={styles.buttonText}>{loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
-          </Pressable>
-
-          {loginStage === 'credentials' && (
-            <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
-              Mot de passe oublié ?
-            </Link>
-          )}
-
-          <View style={styles.separatorRow}>
-            <View style={styles.separatorLine} />
-            <Text style={styles.separatorText}>ou</Text>
-            <View style={styles.separatorLine} />
-          </View>
-
-          <Pressable style={[styles.passkeyButton, isLoading && styles.buttonDisabled]} onPress={handlePasskeyLogin} disabled={isLoading}>
-            <Text style={styles.passkeyButtonText}>🔑 Se connecter avec une passkey</Text>
-          </Pressable>
-          <Text style={styles.passkeyHint}>
-            S’ouvre dans le navigateur : ta passkey du site Lootopia (Face ID / empreinte) te reconnecte ici automatiquement.
-          </Text>
-        </>
+      {loginStage === 'credentials' && (
+        <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
+          Mot de passe oublié ?
+        </Link>
       )}
+
+      <View style={styles.separatorRow}>
+        <View style={styles.separatorLine} />
+        <Text style={styles.separatorText}>ou</Text>
+        <View style={styles.separatorLine} />
+      </View>
+
+      <Pressable style={[styles.passkeyButton, isLoading && styles.buttonDisabled]} onPress={handlePasskeyLogin} disabled={isLoading}>
+        <Text style={styles.passkeyButtonText}>🔑 Se connecter avec une passkey</Text>
+      </Pressable>
+      <Text style={styles.passkeyHint}>
+        S’ouvre dans le navigateur : ta passkey du site Lootopia (Face ID / empreinte) te reconnecte ici automatiquement.
+      </Text>
 
       {loginStage === 'mfa' && (
         <Pressable style={styles.linkButton} onPress={handleResetMfa}>
@@ -212,15 +167,6 @@ const styles = StyleSheet.create({
   button: { backgroundColor: colors.gold, paddingVertical: 16, borderRadius: radii.md, alignItems: 'center', marginTop: 8 },
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: colors.background, fontWeight: '900', fontSize: 16 },
-  demoHint: { color: colors.textMuted, fontWeight: '600', marginBottom: 6 },
-  roleButton: { ...glassCard, borderRadius: radii.md, paddingVertical: 16, alignItems: 'center', marginTop: 10 },
-  roleButtonText: { color: colors.foreground, fontWeight: '700', fontSize: 15 },
-  rolePlayerButton: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
-  rolePlayerButtonText: { color: colors.gold, fontWeight: '900' },
-  demoButton: { borderWidth: 1, borderColor: colors.gold, borderStyle: 'dashed', borderRadius: radii.md, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 16, alignItems: 'center', backgroundColor: colors.glass },
-  demoButtonActive: { backgroundColor: colors.goldSoft, borderStyle: 'solid' },
-  demoButtonText: { color: colors.gold, fontWeight: '700', fontSize: 14 },
-  demoButtonTextActive: { color: colors.gold },
   forgotLink: { textAlign: 'right', marginTop: 10, color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   separatorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 6 },
   separatorLine: { flex: 1, height: 1, backgroundColor: colors.glassBorderStrong },

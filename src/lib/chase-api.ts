@@ -1,5 +1,4 @@
 import * as SecureStore from 'expo-secure-store';
-import { chases as mockChases } from '@/src/data/mock';
 
 // Même API que l'auth (contrat /hunt, /profile, /auth sur le même serveur).
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
@@ -92,11 +91,10 @@ type ApiError = {
   message?: string;
 };
 
-const fallbackProgressStore = new Map<string, UserProgress>();
-
-// Les données mock partagent désormais la même forme `Chase` que l'API (voir
-// src/data/mock.ts, alignées sur le frontend web) : plus besoin de normaliser.
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+// Suivi LOCAL de la progression par étape : le contrat backend ne gère pas les
+// étapes individuellement (la complétion d'une chasse passe par
+// PATCH /profile {huntId}) — ce n'est pas un mock, c'est l'état de jeu client.
+const localProgressStore = new Map<string, UserProgress>();
 
 const parseJson = async <T,>(response: Response): Promise<T> => {
   const contentType = response.headers.get('content-type') || '';
@@ -122,16 +120,15 @@ const request = async <T,>(path: string, init: RequestInit = {}) => {
 
   if (!response.ok) {
     const body = await parseJson<ApiError>(response);
-    throw new Error(body.message || 'Request failed');
+    throw new Error(body.message || `Requête échouée (${response.status})`);
   }
 
   return parseJson<T>(response);
 };
 
-// Le vrai backend ne renvoie pas forcément tous les champs que le mock
-// garantissait : `GET /hunt` (liste) ne contient PAS les étapes (elles sont
-// inline uniquement sur `GET /hunt/{id}`), et rating/participants/location
-// peuvent manquer. On normalise pour que l'UI puisse compter sur la forme.
+// Le backend ne renvoie pas forcément tous les champs : `GET /hunt` (liste) ne
+// contient PAS les étapes (inline uniquement sur `GET /hunt/{id}`), et
+// rating/participants/location peuvent manquer. On normalise la forme.
 const normalizeChase = (raw: Partial<Chase> & { id: string }): Chase => ({
   id: raw.id,
   title: raw.title ?? 'Chasse sans titre',
@@ -169,61 +166,27 @@ const normalizeChasesResponse = (response: unknown): Chase[] => {
     .map(normalizeChase);
 };
 
-const ensureFallbackProgress = (chase: Chase) => {
-  const existing = fallbackProgressStore.get(chase.id);
-  if (existing) {
-    return existing;
-  }
-
-  return null;
-};
-
-// Source des dernières chasses servies : permet à l'UI d'afficher clairement
-// quand on est sur les données de démonstration (serveur injoignable, session
-// démo ou token rejeté) plutôt que sur le catalogue réel du backend.
-let lastChasesSource: 'api' | 'mock' = 'mock';
-export const getLastChasesSource = () => lastChasesSource;
+const buildLocalProgress = (chase: Chase): UserProgress => ({
+  userId: 'me',
+  chaseId: chase.id,
+  currentStep: 1,
+  totalSteps: chase.steps.length,
+  pointsEarned: 0,
+  startedAt: new Date().toISOString(),
+  stepProgress: chase.steps.map((step) => ({ stepId: step.id, completed: false })),
+});
 
 export const chaseApi = {
   // GET /hunt — chasses actives (contrat Hunts).
   getChases: async (): Promise<Chase[]> => {
-    try {
-      const response = await request<unknown>('/hunt');
-      lastChasesSource = 'api';
-      return normalizeChasesResponse(response);
-    } catch {
-      lastChasesSource = 'mock';
-      return clone(mockChases);
-    }
+    const response = await request<unknown>('/hunt');
+    return normalizeChasesResponse(response);
   },
 
   // GET /hunt/{id} — la chasse et ses étapes (inline).
   getChase: async (chaseId: string): Promise<Chase> => {
-    try {
-      const chase = await request<Partial<Chase> & { id: string }>(`/hunt/${chaseId}`);
-      return normalizeChase(chase);
-    } catch {
-      const chase = mockChases.find((item) => item.id === chaseId);
-      if (!chase) {
-        throw new Error('Chase not found');
-      }
-
-      return clone(chase);
-    }
-  },
-
-  getProgress: async (chaseId: string): Promise<UserProgress | null> => {
-    try {
-      return await request<UserProgress>(`/chases/${chaseId}/progress`);
-    } catch {
-      const chase = mockChases.find((item) => item.id === chaseId);
-      if (!chase) {
-        return null;
-      }
-
-      const progress = ensureFallbackProgress(chase);
-      return progress ?? null;
-    }
+    const chase = await request<Partial<Chase> & { id: string }>(`/hunt/${chaseId}`);
+    return normalizeChase(chase);
   },
 
   // POST /hunt/join {huntId} — rejoindre une chasse active.
@@ -244,191 +207,90 @@ export const chaseApi = {
 
   // GET /hunt/joined — chasses rejointes non terminées.
   getJoinedHunts: async (): Promise<Chase[]> => {
-    try {
-      const response = await request<unknown>('/hunt/joined');
-      return normalizeChasesResponse(response);
-    } catch {
-      return [];
-    }
+    const response = await request<unknown>('/hunt/joined');
+    return normalizeChasesResponse(response);
   },
 
-  // Démarrage côté joueur : rejoint la chasse via le contrat (/hunt/join) puis
-  // construit la progression locale (le suivi par étape reste local au mobile).
-  startChase: async (chaseId: string): Promise<UserProgress> => {
-    try {
-      await chaseApi.joinHunt(chaseId);
-      const chase = await chaseApi.getChase(chaseId);
-      const progress: UserProgress = {
-        userId: 'mobile-user',
-        chaseId,
-        currentStep: 1,
-        totalSteps: chase.steps.length,
-        pointsEarned: 0,
-        startedAt: new Date().toISOString(),
-        stepProgress: chase.steps.map((step) => ({ stepId: step.id, completed: false })),
-      };
-      fallbackProgressStore.set(chaseId, progress);
-      return progress;
-    } catch {
-      const chase = await chaseApi.getChase(chaseId);
-      const progress: UserProgress = {
-        userId: 'mobile-user',
-        chaseId,
-        currentStep: 1,
-        totalSteps: chase.steps.length,
-        pointsEarned: 0,
-        startedAt: new Date().toISOString(),
-        stepProgress: chase.steps.map((step) => ({ stepId: step.id, completed: false })),
-      };
+  // Progression locale (le backend ne suit pas les étapes individuelles).
+  getProgress: async (chaseId: string): Promise<UserProgress | null> =>
+    localProgressStore.get(chaseId) ?? null,
 
-      fallbackProgressStore.set(chaseId, progress);
-      return progress;
-    }
+  // Démarrage : rejoint la chasse via le contrat puis initialise la
+  // progression locale par étape.
+  startChase: async (chaseId: string): Promise<UserProgress> => {
+    await chaseApi.joinHunt(chaseId);
+    const chase = await chaseApi.getChase(chaseId);
+    const progress = buildLocalProgress(chase);
+    localProgressStore.set(chaseId, progress);
+    return progress;
   },
 
   completeStep: async (chaseId: string, stepId: string): Promise<ChaseStep> => {
-    try {
-      return await request<ChaseStep>(`/chases/${chaseId}/steps/${stepId}/complete`, {
-        method: 'POST',
-      });
-    } catch {
-      const chase = await chaseApi.getChase(chaseId);
-      const step = chase.steps.find((item) => item.id === stepId);
-
-      if (!step) {
-        throw new Error('Step not found');
-      }
-
-      const nextProgress = fallbackProgressStore.get(chaseId) ?? (await chaseApi.startChase(chaseId));
-      const updatedProgress: UserProgress = {
-        ...nextProgress,
-        stepProgress: nextProgress.stepProgress.map((progressStep) =>
-          progressStep.stepId === stepId
-            ? { ...progressStep, completed: true, completedAt: new Date().toISOString() }
-            : progressStep
-        ),
-      };
-
-      updatedProgress.currentStep = Math.min(
-        updatedProgress.stepProgress.filter((progressStep) => progressStep.completed).length + 1,
-        updatedProgress.totalSteps
-      );
-      updatedProgress.pointsEarned += step.reward ?? 10;
-
-      fallbackProgressStore.set(chaseId, updatedProgress);
-      return { ...step, completed: true };
+    const chase = await chaseApi.getChase(chaseId);
+    const step = chase.steps.find((item) => item.id === stepId);
+    if (!step) {
+      throw new Error('Étape introuvable');
     }
+
+    const progress = localProgressStore.get(chaseId) ?? buildLocalProgress(chase);
+    const updated: UserProgress = {
+      ...progress,
+      stepProgress: progress.stepProgress.map((item) =>
+        item.stepId === stepId ? { ...item, completed: true, completedAt: new Date().toISOString() } : item
+      ),
+    };
+    updated.currentStep = Math.min(
+      updated.stepProgress.filter((item) => item.completed).length + 1,
+      updated.totalSteps
+    );
+    updated.pointsEarned += step.reward ?? 10;
+    localProgressStore.set(chaseId, updated);
+
+    return { ...step, completed: true };
   },
 
   interactAR: async (chaseId: string, stepId: string): Promise<{ success: boolean; progress: UserProgress | null }> => {
-    try {
-      return await request<{ success: boolean; progress: UserProgress | null }>(
-        `/chases/${chaseId}/steps/${stepId}/ar-interact`,
-        { method: 'POST' }
-      );
-    } catch {
-      const progress = fallbackProgressStore.get(chaseId);
-      if (!progress) {
-        return { success: true, progress: null };
-      }
-
-      const nextProgress: UserProgress = {
-        ...progress,
-        stepProgress: progress.stepProgress.map((progressStep) =>
-          progressStep.stepId === stepId ? { ...progressStep, arInteraction: true } : progressStep
-        ),
-      };
-
-      fallbackProgressStore.set(chaseId, nextProgress);
-      return { success: true, progress: nextProgress };
+    const progress = localProgressStore.get(chaseId);
+    if (!progress) {
+      return { success: true, progress: null };
     }
+    const updated: UserProgress = {
+      ...progress,
+      stepProgress: progress.stepProgress.map((item) =>
+        item.stepId === stepId ? { ...item, arInteraction: true } : item
+      ),
+    };
+    localProgressStore.set(chaseId, updated);
+    return { success: true, progress: updated };
   },
 
   completeChase: async (chaseId: string): Promise<{ pointsEarned: number }> => {
-    try {
-      return await request<{ pointsEarned: number }>(`/chases/${chaseId}/complete`, {
-        method: 'POST',
-      });
-    } catch {
-      const progress = fallbackProgressStore.get(chaseId);
-      return { pointsEarned: progress?.pointsEarned ?? 0 };
-    }
+    const progress = localProgressStore.get(chaseId);
+    return { pointsEarned: progress?.pointsEarned ?? 0 };
   },
+
   // POST /hunt — contrat : {title, description, image, partnerId, difficulty,
   // estimatedDuration, status?, steps[]} (admin/partner). On mappe l'objet
   // `partner` local vers `partnerId` attendu par l'API.
   createChase: async (payload: Partial<Chase>): Promise<Chase> => {
-    try {
-      const { partner, ...rest } = payload;
-      return await request<Chase>('/hunt', {
-        method: 'POST',
-        body: JSON.stringify({ ...rest, partnerId: partner?.id }),
-      });
-    } catch {
-      // Fallback: create a local draft chase
-      const id = `local-${Math.random().toString(36).slice(2, 9)}`;
-      const now = new Date().toISOString();
-      const chase: Chase = {
-        id,
-        title: payload.title ?? 'Nouvelle chasse',
-        description: payload.description ?? '',
-        image: payload.image,
-        partner: payload.partner ?? {
-          id: `partner-${id}`,
-          name: 'Mobile Partner',
-          email: 'partner@local',
-          description: '',
-          logo: '',
-          chases: [],
-        },
-        difficulty: (payload.difficulty as Chase['difficulty']) ?? 'easy',
-        estimatedDuration: payload.estimatedDuration ?? 30,
-        location: payload.location ?? { latitude: 43.2965, longitude: 5.3698 },
-        createdAt: now,
-        updatedAt: now,
-        status: 'draft',
-        participants: 0,
-        rating: 0,
-        steps: payload.steps ?? [],
-      };
-
-      return chase;
-    }
+    const { partner, ...rest } = payload;
+    const chase = await request<Partial<Chase> & { id: string }>('/hunt', {
+      method: 'POST',
+      body: JSON.stringify({ ...rest, partnerId: partner?.id }),
+    });
+    return normalizeChase(chase);
   },
 
   // PATCH /hunt/{id} — mise à jour partielle (admin ou propriétaire).
   updateChase: async (chaseId: string, payload: Partial<Chase>): Promise<Chase> => {
-    try {
-      return await request<Chase>(`/hunt/${chaseId}`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      // Fallback: attempt to fetch chase and merge changes locally
-      const existing = await (async () => {
-        try {
-          return await chaseApi.getChase(chaseId);
-        } catch {
-          return null;
-        }
-      })();
-
-      if (!existing) {
-        throw new Error('Chase not found');
-      }
-
-      const updated: Chase = {
-        ...existing,
-        ...payload,
-        updatedAt: new Date().toISOString(),
-      } as Chase;
-
-      return updated;
-    }
+    const chase = await request<Partial<Chase> & { id: string }>(`/hunt/${chaseId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return normalizeChase(chase);
   },
 
-  // DELETE /hunt/{id} — suppression (admin ou propriétaire). Pas de fallback
-  // mock : une suppression "simulée" serait trompeuse.
+  // DELETE /hunt/{id} — suppression (admin ou propriétaire).
   deleteChase: async (chaseId: string): Promise<void> => {
     await request<void>(`/hunt/${chaseId}`, { method: 'DELETE' });
   },

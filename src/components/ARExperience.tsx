@@ -6,7 +6,6 @@ import * as Location from 'expo-location';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
-import { useDemo } from '@/src/state/DemoContext';
 import { colors, glassCard, radii } from '@/src/theme';
 import { haversineDistanceMeters } from '@/src/lib/geo';
 import { buildChest } from '@/src/components/three/buildCharacter';
@@ -64,7 +63,6 @@ export function ARExperience({
   combatEnabled = true,
   onComplete,
 }: ARExperienceProps) {
-  const { demoMode } = useDemo();
   const [permission, requestPermission] = useCameraPermissions();
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -123,9 +121,9 @@ export function ARExperience({
   }, [currentLocation, effectiveTarget]);
 
   const isWithinRange = distanceMeters !== null && distanceMeters <= radiusMeters;
-  const isReadyToValidate = (demoMode || isWithinRange) && !isLiveBlocked;
+  const isReadyToValidate = isWithinRange && !isLiveBlocked;
   // "Photo secrecy" : l'indice photo n'est révélé qu'à moins de 15 m du point.
-  const isPhotoClueUnlocked = demoMode || (distanceMeters !== null && distanceMeters <= PHOTO_CLUE_RADIUS_METERS);
+  const isPhotoClueUnlocked = distanceMeters !== null && distanceMeters <= PHOTO_CLUE_RADIUS_METERS;
 
   const completeStep = (message: string) => {
     if (hasLaunched) {
@@ -311,11 +309,9 @@ export function ARExperience({
           </View>
         )}
         <Text style={styles.statusText}>
-          {demoMode
-            ? '🧪 Mode démo — validation autorisée partout'
-            : locationPermissionGranted
-              ? `Position: ${distanceMeters ?? '?'} m du point`
-              : 'Géolocalisation indisponible'}
+          {locationPermissionGranted
+            ? `Position: ${distanceMeters ?? '?'} m du point`
+            : 'Géolocalisation indisponible'}
         </Text>
         <Text style={styles.helperText}>
           {validationMessage || 'Approche-toi du point — ou scanne le QR code de l’étape avec la caméra.'}

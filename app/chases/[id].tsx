@@ -48,10 +48,16 @@ export default function ChaseDetailScreen() {
     return chase.steps[Math.max(0, progress.currentStep - 1)] ?? chase.steps[0];
   }, [chase, progress]);
 
-  const handleStartOrContinue = async () => {
+  // Bouton de lancement UNIQUE : un seul geste accepte la chasse si besoin
+  // (POST /hunt/join via HuntsContext), initialise la progression, puis ouvre
+  // directement l'étape courante en AR. Plus de parcours en plusieurs étapes.
+  const handleLaunch = async () => {
     if (!chase) return;
 
     try {
+      if (!isAccepted(chase.id)) {
+        await acceptHunt(chase.id);
+      }
       const nextProgress = progress ?? (await chaseApi.startChase(chase.id));
       setProgress(nextProgress);
       router.push(`/ar/${chase.id}?stepId=${activeStep?.id ?? chase.steps[0]?.id}`);
@@ -83,15 +89,11 @@ export default function ChaseDetailScreen() {
         </View>
       </ImageBackground>
 
-      {/* Acceptation de la chasse (persistée via HuntsContext) */}
-      {accepted ? (
+      {/* Statut : l'acceptation passe désormais par le bouton de lancement unique. */}
+      {accepted && (
         <View style={styles.acceptedBanner}>
           <Text style={styles.acceptedBannerText}>Chasse en cours ✓</Text>
         </View>
-      ) : (
-        <Pressable style={styles.acceptButton} onPress={() => acceptHunt(chase.id)}>
-          <Text style={styles.acceptButtonText}>Accepter la chasse</Text>
-        </Pressable>
       )}
 
       <View style={styles.card}>
@@ -133,8 +135,10 @@ export default function ChaseDetailScreen() {
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
-      <Pressable style={styles.actionButton} onPress={handleStartOrContinue}>
-        <Text style={styles.actionText}>Lancer / Continuer la chasse</Text>
+      <Pressable style={styles.actionButton} onPress={handleLaunch}>
+        <Text style={styles.actionText}>
+          {progress || accepted ? '▶ Continuer la chasse' : '🚀 Lancer la chasse'}
+        </Text>
       </Pressable>
     </ScrollView>
   );

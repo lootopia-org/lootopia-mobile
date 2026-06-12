@@ -103,10 +103,13 @@ export function FieldProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
         try {
+          // Publication directe : la chasse part en "active" (un seul geste,
+          // pas d'état brouillon intermédiaire côté serveur). Le brouillon
+          // local n'est qu'un espace de travail avant publication.
           await chaseApi.createChase({
             title: draft.title,
-            description: `Brouillon créé sur le terrain (${draft.steps.length} étapes)`,
-            status: 'draft',
+            description: `Chasse créée sur le terrain (${draft.steps.length} étapes)`,
+            status: 'active',
             steps: draft.steps.map((step, index) => ({
               id: step.id,
               order: index + 1,

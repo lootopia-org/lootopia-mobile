@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { authApi, type RegisterPayload, type User, type UserRole } from '@/src/lib/auth-api';
+import { authApi, type RegisterPayload, type User } from '@/src/lib/auth-api';
+import { setTotpStatus } from '@/src/lib/totp-status';
 
 type LoginStage = 'credentials' | 'mfa';
 
@@ -9,17 +10,14 @@ type AuthContextValue = {
   user: User | null;
   isReady: boolean;
   isAuthenticated: boolean;
-  // Token de session courant (null si déconnecté, DEMO_TOKEN en mode démo).
-  // Exposé pour les écrans qui appellent les endpoints authentifiés
-  // (TOTP enroll/disable, liste des passkeys...).
+  // Token de session courant (null si déconnecté). Exposé pour les écrans qui
+  // appellent les endpoints authentifiés (TOTP, passkeys, profil...).
   token: string | null;
-  isDemoSession: boolean;
   loginStage: LoginStage;
   pendingToken: string | null;
   pendingMethods: Array<'totp' | 'webauthn'>;
   emailNotVerified: boolean;
   signIn: (email: string, password: string) => Promise<{ mfaRequired: boolean }>;
-  signInDemo: (role?: UserRole) => Promise<void>;
   // Connexion par token déjà émis (retour du flow passkey via navigateur :
   // la page web authentifie en WebAuthn puis renvoie le JWT par deep link).
   signInWithToken: (token: string) => Promise<void>;
@@ -35,14 +33,6 @@ type AuthContextValue = {
 const STORAGE_KEY = 'lootopia-mobile-user';
 const TOKEN_KEY = 'lootopia-mobile-token';
 const PENDING_TOKEN_KEY = 'lootopia-mobile-pending-token';
-const DEMO_TOKEN = 'demo-token';
-
-// Comptes démo alignés sur les comptes mock du frontend web (mock-auth.ts).
-const DEMO_USERS: Record<UserRole, User> = {
-  admin: { id: 'mock-admin', username: 'Lootopia Admin', email: 'admin@lootopia.local', role: 'admin' },
-  partner: { id: 'mock-partner', username: 'Partner Studio', email: 'partner@lootopia.local', role: 'partner' },
-  player: { id: 'mock-player', username: 'Treasure Player', email: 'player@lootopia.local', role: 'player' },
-};
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -65,17 +55,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (storedUser && storedToken) {
         try {
-          const parsedUser = JSON.parse(storedUser) as User;
-          if (storedToken === DEMO_TOKEN) {
-            // Session démo (mock) : on restaure sans appel réseau.
-            setUser(parsedUser);
-            setToken(storedToken);
-          } else {
-            const refreshedUser = await authApi.me(storedToken);
-            setUser(refreshedUser);
-            setToken(storedToken);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(refreshedUser));
-          }
+          const refreshedUser = await authApi.me(storedToken);
+          setUser(refreshedUser);
+          setToken(storedToken);
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(refreshedUser));
         } catch {
           await Promise.all([
             AsyncStorage.removeItem(STORAGE_KEY),
@@ -124,7 +107,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isReady,
       isAuthenticated: Boolean(user && token),
       token,
-      isDemoSession: token === DEMO_TOKEN,
       loginStage,
       pendingToken,
       pendingMethods,
@@ -137,6 +119,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await persistPendingToken(response.token);
           setPendingMethods(response.mfaMethods);
           setLoginStage('mfa');
+          // Signal fiable : le serveur exige un TOTP → il est activé sur ce compte.
+          if (response.mfaMethods.includes('totp')) {
+            await setTotpStatus(true);
+          }
           return { mfaRequired: true };
         }
 
@@ -148,13 +134,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await persistPendingToken(null);
 
         return { mfaRequired: false };
-      },
-      signInDemo: async (role: UserRole = 'player') => {
-        await persistToken(DEMO_TOKEN);
-        await persist(DEMO_USERS[role]);
-        setLoginStage('credentials');
-        setPendingMethods([]);
-        await persistPendingToken(null);
       },
       signInWithToken: async (nextToken: string) => {
         // Le token vient du deep link : on le valide auprès de l'API avant de

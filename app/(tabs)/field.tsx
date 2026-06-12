@@ -32,7 +32,7 @@ import { AudioHintRecorder } from '@/src/components/field/AudioHintRecorder';
 type Section = 'drafts' | 'liveops' | 'heatmap';
 
 const SECTIONS: Array<{ key: Section; label: string }> = [
-  { key: 'drafts', label: 'Brouillons' },
+  { key: 'drafts', label: 'Création' },
   { key: 'liveops', label: 'Live ops' },
   { key: 'heatmap', label: 'Heatmap' },
 ];
@@ -164,7 +164,7 @@ function DraftsSection() {
       <View style={styles.createRow}>
         <TextInput
           style={styles.createInput}
-          placeholder="Titre du nouveau brouillon…"
+          placeholder="Titre de la nouvelle chasse…"
           placeholderTextColor={colors.textFaint}
           value={newTitle}
           onChangeText={setNewTitle}
@@ -183,7 +183,7 @@ function DraftsSection() {
       {drafts.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyText}>
-            Aucun brouillon pour le moment. Crée-en un, puis dépose des étapes là où tu te trouves.
+            Aucune chasse en préparation. Crée-en une, puis dépose des étapes là où tu te trouves.
           </Text>
         </View>
       ) : null}
@@ -200,7 +200,7 @@ function DraftsSection() {
                 </Text>
                 <View style={[styles.badge, draft.synced ? styles.badgeSynced : styles.badgeLocal]}>
                   <Text style={[styles.badgeText, draft.synced ? styles.badgeTextSynced : styles.badgeTextLocal]}>
-                    {draft.synced ? 'Synchronisé' : 'Local'}
+                    {draft.synced ? 'Publiée ✓' : 'En préparation'}
                   </Text>
                 </View>
               </View>
@@ -217,7 +217,7 @@ function DraftsSection() {
                 <InlineTitleInput
                   key={`title-${draft.id}`}
                   value={draft.title}
-                  placeholder="Titre du brouillon"
+                  placeholder="Titre de la chasse"
                   onCommit={(title) => void renameDraft(draft.id, title)}
                 />
 
@@ -257,18 +257,18 @@ function DraftsSection() {
                   {status === 'pending' ? (
                     <ActivityIndicator size="small" color={colors.teal} />
                   ) : (
-                    <Text style={styles.syncButtonText}>⤴ Synchroniser vers l'éditeur web</Text>
+                    <Text style={styles.syncButtonText}>🚀 Publier la chasse</Text>
                   )}
                 </Pressable>
                 {status === 'success' ? (
-                  <Text style={styles.syncSuccess}>✓ Brouillon envoyé vers l'éditeur web</Text>
+                  <Text style={styles.syncSuccess}>✓ Chasse publiée — visible par les joueurs</Text>
                 ) : null}
                 {status === 'error' ? (
                   <Text style={styles.errorText}>Échec de la synchronisation — réessaie plus tard.</Text>
                 ) : null}
 
                 <Pressable onPress={() => void deleteDraft(draft.id)}>
-                  <Text style={styles.deleteDraft}>Supprimer ce brouillon</Text>
+                  <Text style={styles.deleteDraft}>Supprimer cette chasse</Text>
                 </Pressable>
               </View>
             ) : null}
