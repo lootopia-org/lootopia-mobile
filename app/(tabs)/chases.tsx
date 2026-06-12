@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, ImageBackground, Pressable, StyleSheet, Te
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import { chaseApi, getLastChasesSource, type Chase } from '@/src/lib/chase-api';
 import { useHunts } from '@/src/state/HuntsContext';
 import { colors, radii } from '@/src/theme';
 import { formatDistance, haversineDistanceMeters, type GeoPoint } from '@/src/lib/geo';
@@ -21,6 +21,7 @@ export default function ChasesScreen() {
   const [chases, setChases] = useState<Chase[]>([]);
   const [position, setPosition] = useState<GeoPoint | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMockData, setIsMockData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function ChasesScreen() {
         setIsLoading(true);
         setError(null);
         setChases(await chaseApi.getChases());
+        setIsMockData(getLastChasesSource() === 'mock');
       } catch {
         setError('Impossible de charger les chasses.');
       } finally {
@@ -69,6 +71,14 @@ export default function ChasesScreen() {
       <Text style={styles.subheader}>
         {position ? 'Triées de la plus proche à la plus lointaine' : 'Autour de toi et dans la région'}
       </Text>
+      {isMockData && (
+        <View style={styles.mockBanner}>
+          <Text style={styles.mockBannerText}>
+            🧪 Données de démonstration — serveur injoignable ou session démo. Connecte-toi avec un vrai
+            compte pour voir le catalogue du site.
+          </Text>
+        </View>
+      )}
       {error && <Text style={styles.error}>{error}</Text>}
       <FlatList
         data={sorted}
@@ -148,6 +158,8 @@ const styles = StyleSheet.create({
   meta: { color: colors.gold, fontWeight: '700', fontSize: 11 },
   acceptButton: { backgroundColor: colors.gold, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 6 },
   acceptText: { color: colors.background, fontWeight: '900', fontSize: 12 },
+  mockBanner: { borderColor: colors.gold, borderWidth: 1, backgroundColor: colors.goldSoft, borderRadius: radii.md, padding: 10, marginBottom: 12 },
+  mockBannerText: { color: colors.gold, fontSize: 11, lineHeight: 16, fontWeight: '600' },
   error: { color: colors.danger, marginBottom: 12, fontWeight: '700' },
   empty: { textAlign: 'center', marginTop: 24, color: colors.textMuted },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },

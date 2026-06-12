@@ -178,13 +178,21 @@ const ensureFallbackProgress = (chase: Chase) => {
   return null;
 };
 
+// Source des dernières chasses servies : permet à l'UI d'afficher clairement
+// quand on est sur les données de démonstration (serveur injoignable, session
+// démo ou token rejeté) plutôt que sur le catalogue réel du backend.
+let lastChasesSource: 'api' | 'mock' = 'mock';
+export const getLastChasesSource = () => lastChasesSource;
+
 export const chaseApi = {
   // GET /hunt — chasses actives (contrat Hunts).
   getChases: async (): Promise<Chase[]> => {
     try {
       const response = await request<unknown>('/hunt');
+      lastChasesSource = 'api';
       return normalizeChasesResponse(response);
     } catch {
+      lastChasesSource = 'mock';
       return clone(mockChases);
     }
   },
