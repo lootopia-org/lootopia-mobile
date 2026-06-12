@@ -1,9 +1,14 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/src/state/AuthContext';
 import { colors } from '@/src/theme';
 
 export default function TabsLayout() {
+  const { user } = useAuth();
+  // Mode Terrain réservé aux partenaires/admins (mêmes rôles que le web).
+  const canAccessField = user?.role === 'partner' || user?.role === 'admin';
+
   return (
     <Tabs
       screenOptions={{
@@ -34,6 +39,15 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="in-progress"
         options={{ title: 'En cours', tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="field"
+        options={{
+          title: 'Terrain',
+          // href: null masque l'onglet pour les joueurs (l'écran re-vérifie le rôle).
+          href: canAccessField ? undefined : null,
+          tabBarIcon: ({ color, size }) => <Ionicons name="construct-outline" color={color} size={size} />,
+        }}
       />
       <Tabs.Screen
         name="account"

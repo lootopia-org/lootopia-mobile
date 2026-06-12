@@ -5,9 +5,15 @@
     "scheme": "lootopia",
     "version": "1.0.0",
     "orientation": "portrait",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "userInterfaceStyle": "light",
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      "expo-audio"
+    ],
     "ios": {
       "supportsTablet": false
     },

@@ -47,18 +47,21 @@ describe('authApi', () => {
 
   describe('register', () => {
     it('should call register endpoint', async () => {
-      const email = 'test@example.com';
-      const password = 'password123';
+      const payload = {
+        username: 'TestPlayer',
+        email: 'test@example.com',
+        password: 'password123',
+      };
       
       mockedFetch.mockImplementation(mockSuccessResponse({}));
       
-      await authApi.register(email, password);
+      await authApi.register(payload);
       
       expect(mockedFetch).toHaveBeenCalledWith(
         expect.stringContaining('/auth/register'),
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify(payload),
         })
       );
     });
@@ -221,7 +224,7 @@ describe('authApi', () => {
       const result = await authApi.me(token);
       
       expect(mockedFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/me'),
+        expect.stringContaining('/auth/me'),
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),

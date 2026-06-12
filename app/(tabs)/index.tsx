@@ -10,8 +10,9 @@ import { useDemo } from '@/src/state/DemoContext';
 import { PlayerCharacter3D } from '@/src/components/PlayerCharacter3D';
 import { colors, darkMapStyle, glassStrongCard, radii } from '@/src/theme';
 import { bearingDegrees, formatDistance, haversineDistanceMeters, smoothPosition, type GeoPoint } from '@/src/lib/geo';
-import { playerStats } from '@/src/data/mock';
 import { getFps } from '@/src/lib/perf';
+import { recordBreadcrumb } from '@/src/lib/heatmap';
+import { usePlayerProfile } from '@/src/hooks/usePlayerProfile';
 
 // Position de repli (zone des chasses mock à San Francisco) quand le GPS est
 // indisponible — notamment en mode démo sur simulateur.
@@ -34,6 +35,8 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { demoMode } = useDemo();
   const { avatarModel, acceptHunt, isAccepted } = useHunts();
+  // Niveau/points réels du joueur (GET /profile), mock en démo/hors-ligne.
+  const { level, points } = usePlayerProfile();
 
   const mapRef = useRef<MapView>(null);
   const [hunts, setHunts] = useState<Chase[]>([]);
@@ -98,6 +101,8 @@ export default function MapScreen() {
     lastPosition.current = smoothed;
     setPosition(smoothed);
     mapRef.current?.animateCamera({ center: smoothed }, { duration: 800 });
+    // Alimente la heatmap joueur (échantillonnage géré par la lib).
+    void recordBreadcrumb(smoothed);
 
     // Adaptation du profil GPS à la distance de la chasse la plus proche.
     const distances = huntsRef.current.map((hunt) => haversineDistanceMeters(smoothed, hunt.location));
@@ -157,10 +162,14 @@ export default function MapScreen() {
 
   const huntsWithDistance = useMemo(
     () =>
-      hunts.map((hunt) => ({
-        hunt,
-        distance: effectivePosition ? haversineDistanceMeters(effectivePosition, hunt.location) : null,
-      })),
+      hunts
+        // Garde : le backend peut renvoyer des chasses sans coordonnées
+        // (normalisées à 0,0) — on ne les affiche pas sur la carte.
+        .filter((hunt) => hunt.location.latitude !== 0 || hunt.location.longitude !== 0)
+        .map((hunt) => ({
+          hunt,
+          distance: effectivePosition ? haversineDistanceMeters(effectivePosition, hunt.location) : null,
+        })),
     [hunts, effectivePosition]
   );
 
@@ -267,10 +276,10 @@ export default function MapScreen() {
       {/* HUD niveau / points */}
       <View style={[styles.hud, { top: insets.top + 10 }]}>
         <View style={styles.hudPill}>
-          <Text style={styles.hudGold}>⭐ Niv. {playerStats.level}</Text>
+          <Text style={styles.hudGold}>⭐ Niv. {level}</Text>
         </View>
         <View style={styles.hudPill}>
-          <Text style={styles.hudTeal}>{playerStats.points} pts</Text>
+          <Text style={styles.hudTeal}>{points} pts</Text>
         </View>
         {demoMode && (
           <View style={styles.hudPill}>

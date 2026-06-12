@@ -85,11 +85,34 @@ const request = async <T,>(path: string, init: RequestInit = {}) => {
   return parseJson<T>(response);
 };
 
+export type RegisterPayload = {
+  username: string;
+  email: string;
+  password: string;
+  bio?: string;
+  avatar?: string;
+};
+
 export const authApi = {
-  register: (email: string, password: string) =>
+  register: (payload: RegisterPayload) =>
     request<void>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(payload),
+    }),
+
+  forgotPassword: (email: string) =>
+    // L'API renvoie toujours un message générique (pas d'énumération de comptes).
+    request<{ message?: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, newPassword: string) =>
+    // Contrat API : champ `new_password` (snake_case). Lien à usage unique,
+    // expirant, et qui révoque les sessions existantes.
+    request<void>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password: newPassword }),
     }),
 
   verifyEmail: (token: string) =>
@@ -129,7 +152,7 @@ export const authApi = {
     }),
 
   me: (token: string) =>
-    request<User>('/me', {
+    request<User>('/auth/me', {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,

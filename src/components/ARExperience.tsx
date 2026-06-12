@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import { useAudioPlayer } from 'expo-audio';
 import * as Location from 'expo-location';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
@@ -11,6 +12,7 @@ import { haversineDistanceMeters } from '@/src/lib/geo';
 import { buildChest } from '@/src/components/three/buildCharacter';
 import { createFrameLimiter, useAppActiveRef } from '@/src/hooks/useAppActiveRef';
 import { recordFrame } from '@/src/lib/perf';
+import { CombatModal } from '@/src/components/CombatModal';
 
 type ARExperienceProps = {
   clue: string;
@@ -23,8 +25,22 @@ type ARExperienceProps = {
   qrPayload?: string;
   // Occupe tout l'écran (vue AR immersive) au lieu d'une carte de 460 px.
   fullScreen?: boolean;
+  // Indice photo capturé sur site : révélé uniquement à moins de 15 m.
+  photoClueUri?: string;
+  // Indice audio enregistré sur site par l'organisateur.
+  audioHintUri?: string;
+  // Overrides live de l'organisateur (Emergency Pause / Redirect).
+  liveOverride?: {
+    huntPaused?: boolean;
+    stepPaused?: boolean;
+    redirect?: { location: { latitude: number; longitude: number }; note?: string };
+  };
+  // Combat du gardien avant validation (désactivable pour les tests).
+  combatEnabled?: boolean;
   onComplete?: () => void;
 };
+
+const PHOTO_CLUE_RADIUS_METERS = 15;
 
 /**
  * Expérience AR-lite (phase "fonctionnalités avancées") :
@@ -36,13 +52,30 @@ type ARExperienceProps = {
  * Le vrai ancrage ARKit/ARCore (ViroReact + dev build) remplacera la
  * superposition fixe sans changer cette interface.
  */
-export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, fullScreen = false, onComplete }: ARExperienceProps) {
+export function ARExperience({
+  clue,
+  targetLocation,
+  radiusMeters,
+  qrPayload,
+  fullScreen = false,
+  photoClueUri,
+  audioHintUri,
+  liveOverride,
+  combatEnabled = true,
+  onComplete,
+}: ARExperienceProps) {
   const { demoMode } = useDemo();
   const [permission, requestPermission] = useCameraPermissions();
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [hasLaunched, setHasLaunched] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
+  const [showCombat, setShowCombat] = useState(false);
+  const audioPlayer = useAudioPlayer(audioHintUri ?? null);
+
+  // Redirection live : la cible effective remplace celle d'origine.
+  const effectiveTarget = liveOverride?.redirect?.location ?? targetLocation;
+  const isLiveBlocked = Boolean(liveOverride?.huntPaused || liveOverride?.stepPaused);
 
   // Lu par la boucle de rendu GL (pas de re-création de scène sur validation).
   const chestOpenRef = useRef(false);
@@ -86,11 +119,13 @@ export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, fu
     if (!currentLocation) {
       return null;
     }
-    return Math.round(haversineDistanceMeters(currentLocation, targetLocation));
-  }, [currentLocation, targetLocation]);
+    return Math.round(haversineDistanceMeters(currentLocation, effectiveTarget));
+  }, [currentLocation, effectiveTarget]);
 
   const isWithinRange = distanceMeters !== null && distanceMeters <= radiusMeters;
-  const isReadyToValidate = demoMode || isWithinRange;
+  const isReadyToValidate = (demoMode || isWithinRange) && !isLiveBlocked;
+  // "Photo secrecy" : l'indice photo n'est révélé qu'à moins de 15 m du point.
+  const isPhotoClueUnlocked = demoMode || (distanceMeters !== null && distanceMeters <= PHOTO_CLUE_RADIUS_METERS);
 
   const completeStep = (message: string) => {
     if (hasLaunched) {
@@ -103,24 +138,52 @@ export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, fu
   };
 
   const handleValidate = () => {
+    if (isLiveBlocked) {
+      setValidationMessage('⛔ Étape suspendue par l’organisateur — réessaie plus tard.');
+      return;
+    }
     if (!isReadyToValidate) {
       setValidationMessage('Tu dois être à proximité du point (ou scanner son QR code) avant de valider.');
+      return;
+    }
+    if (combatEnabled && !hasLaunched) {
+      // Un gardien protège le coffre : duel de timing avant la validation.
+      setShowCombat(true);
       return;
     }
     completeStep('Étape validée — le coffre est à toi !');
   };
 
   const handleBarcodeScanned = (result: BarcodeScanningResult) => {
-    if (hasLaunched) {
+    if (hasLaunched || showCombat) {
+      return;
+    }
+    if (isLiveBlocked) {
+      setValidationMessage('⛔ Étape suspendue par l’organisateur — réessaie plus tard.');
       return;
     }
     const expected = qrPayload ?? null;
     const matches = expected ? result.data === expected : result.data.startsWith('lootopia:');
     if (matches) {
-      completeStep('QR code reconnu — étape validée !');
+      if (combatEnabled) {
+        setValidationMessage('QR code reconnu — mais un gardien protège le coffre !');
+        setShowCombat(true);
+      } else {
+        completeStep('QR code reconnu — étape validée !');
+      }
     } else {
       setValidationMessage('QR code inconnu pour cette étape.');
     }
+  };
+
+  const handleCombatWon = () => {
+    setShowCombat(false);
+    completeStep('Gardien vaincu — étape validée, le coffre est à toi !');
+  };
+
+  const playAudioHint = () => {
+    audioPlayer.seekTo(0);
+    audioPlayer.play();
   };
 
   // Scène three.js : coffre au trésor sur fond transparent, couvercle animé.
@@ -211,9 +274,42 @@ export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, fu
       </View>
 
       <View style={styles.overlay}>
+        {isLiveBlocked && (
+          <View style={styles.liveBanner}>
+            <Text style={styles.liveBannerText}>
+              ⛔ {liveOverride?.huntPaused ? 'Chasse suspendue' : 'Étape suspendue'} par l’organisateur
+            </Text>
+          </View>
+        )}
+        {liveOverride?.redirect && !isLiveBlocked && (
+          <View style={[styles.liveBanner, styles.redirectBanner]}>
+            <Text style={styles.redirectBannerText}>
+              📍 Étape déplacée par l’organisateur{liveOverride.redirect.note ? ` — ${liveOverride.redirect.note}` : ''}
+            </Text>
+          </View>
+        )}
         <Text style={styles.kicker}>AR EXPERIENCE</Text>
         <Text style={styles.title}>Indice en réalité augmentée</Text>
         <Text style={styles.text}>{clue}</Text>
+
+        {(photoClueUri || audioHintUri) && (
+          <View style={styles.cluesRow}>
+            {photoClueUri &&
+              (isPhotoClueUnlocked ? (
+                <Image source={{ uri: photoClueUri }} style={styles.photoClue} />
+              ) : (
+                <View style={styles.photoClueLocked}>
+                  <Text style={styles.photoClueLockedIcon}>🔒</Text>
+                  <Text style={styles.photoClueLockedText}>Indice photo à moins de {PHOTO_CLUE_RADIUS_METERS} m</Text>
+                </View>
+              ))}
+            {audioHintUri && (
+              <Pressable style={styles.audioButton} onPress={playAudioHint}>
+                <Text style={styles.audioButtonText}>🔊 Indice audio</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
         <Text style={styles.statusText}>
           {demoMode
             ? '🧪 Mode démo — validation autorisée partout'
@@ -230,6 +326,8 @@ export function ARExperience({ clue, targetLocation, radiusMeters, qrPayload, fu
           </Text>
         </Pressable>
       </View>
+
+      <CombatModal visible={showCombat} onWin={handleCombatWon} onFlee={() => setShowCombat(false)} />
     </View>
   );
 }
@@ -248,6 +346,17 @@ const styles = StyleSheet.create({
   button: { marginTop: 16, alignSelf: 'flex-start', backgroundColor: colors.gold, paddingHorizontal: 16, paddingVertical: 14, borderRadius: radii.md },
   buttonDisabled: { opacity: 0.55 },
   buttonText: { color: colors.background, fontWeight: '900' },
+  liveBanner: { backgroundColor: 'rgba(248,113,113,0.16)', borderColor: colors.danger, borderWidth: 1, borderRadius: radii.md, padding: 10, marginBottom: 10 },
+  liveBannerText: { color: colors.danger, fontWeight: '900', fontSize: 12 },
+  redirectBanner: { backgroundColor: colors.tealSoft, borderColor: colors.teal },
+  redirectBannerText: { color: colors.teal, fontWeight: '800', fontSize: 12 },
+  cluesRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
+  photoClue: { width: 86, height: 86, borderRadius: radii.md, borderColor: colors.gold, borderWidth: 1 },
+  photoClueLocked: { width: 130, height: 86, borderRadius: radii.md, borderColor: colors.glassBorderStrong, borderWidth: 1, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center', padding: 8 },
+  photoClueLockedIcon: { fontSize: 18 },
+  photoClueLockedText: { color: colors.textMuted, fontSize: 9, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  audioButton: { backgroundColor: colors.tealSoft, borderColor: colors.teal, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 9 },
+  audioButtonText: { color: colors.teal, fontWeight: '900', fontSize: 12 },
   permissionCard: { ...glassCard, padding: 18 },
   permissionTitle: { fontSize: 18, fontWeight: '900', color: colors.foreground },
   permissionText: { color: colors.textMuted, marginTop: 8, lineHeight: 21 },

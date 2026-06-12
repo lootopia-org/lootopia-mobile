@@ -1,7 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { chases as mockChases } from '@/src/data/mock';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api';
+// Même API que l'auth (contrat /hunt, /profile, /auth sur le même serveur).
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
 const TOKEN_KEY = 'lootopia-mobile-token';
 
 export type Partner = {
@@ -27,7 +28,9 @@ export type ChaseStep = {
   title: string;
   description: string;
   clue: string;
-  location: {
+  // Optionnel : les étapes "checkpoint" sont géolocalisées, les étapes
+  // "riddle" (réponse à une énigme) n'ont pas de position.
+  location?: {
     latitude: number;
     longitude: number;
   };
@@ -40,6 +43,11 @@ export type ChaseStep = {
   // Contenu d'un QR code physique qui valide l'étape (alternative au GPS,
   // utile en intérieur). Format conseillé : "lootopia:<step-id>".
   qrPayload?: string;
+  // Indice photo capturé sur site par le partenaire — révélé au joueur
+  // uniquement à moins de 15 m du point ("photo secrecy").
+  photoClueUri?: string;
+  // Indice audio (10 s max) enregistré sur site par le partenaire.
+  audioHintUri?: string;
 };
 
 export type Chase = {
@@ -120,16 +128,45 @@ const request = async <T,>(path: string, init: RequestInit = {}) => {
   return parseJson<T>(response);
 };
 
+// Le vrai backend ne renvoie pas forcément tous les champs que le mock
+// garantissait : `GET /hunt` (liste) ne contient PAS les étapes (elles sont
+// inline uniquement sur `GET /hunt/{id}`), et rating/participants/location
+// peuvent manquer. On normalise pour que l'UI puisse compter sur la forme.
+const normalizeChase = (raw: Partial<Chase> & { id: string }): Chase => ({
+  id: raw.id,
+  title: raw.title ?? 'Chasse sans titre',
+  description: raw.description ?? '',
+  image: raw.image,
+  difficulty: raw.difficulty ?? 'easy',
+  estimatedDuration: raw.estimatedDuration ?? 0,
+  createdAt: raw.createdAt ?? new Date(0).toISOString(),
+  updatedAt: raw.updatedAt ?? new Date(0).toISOString(),
+  status: raw.status ?? 'active',
+  participants: raw.participants ?? 0,
+  rating: raw.rating ?? 0,
+  partner: raw.partner ?? { id: 'unknown', name: 'Lootopia', email: '', chases: [] },
+  location: raw.location ?? { latitude: 0, longitude: 0 },
+  steps: Array.isArray(raw.steps) ? raw.steps : [],
+});
+
 const normalizeChasesResponse = (response: unknown): Chase[] => {
+  let list: unknown[] = [];
   if (Array.isArray(response)) {
-    return response as Chase[];
+    list = response;
+  } else if (
+    response &&
+    typeof response === 'object' &&
+    'data' in response &&
+    Array.isArray((response as { data: unknown[] }).data)
+  ) {
+    list = (response as { data: unknown[] }).data;
   }
 
-  if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data: Chase[] }).data)) {
-    return (response as { data: Chase[] }).data;
-  }
-
-  return [];
+  return list
+    .filter((item): item is Partial<Chase> & { id: string } =>
+      Boolean(item && typeof item === 'object' && 'id' in item)
+    )
+    .map(normalizeChase);
 };
 
 const ensureFallbackProgress = (chase: Chase) => {
@@ -142,18 +179,21 @@ const ensureFallbackProgress = (chase: Chase) => {
 };
 
 export const chaseApi = {
+  // GET /hunt — chasses actives (contrat Hunts).
   getChases: async (): Promise<Chase[]> => {
     try {
-      const response = await request<unknown>('/chases');
+      const response = await request<unknown>('/hunt');
       return normalizeChasesResponse(response);
     } catch {
       return clone(mockChases);
     }
   },
 
+  // GET /hunt/{id} — la chasse et ses étapes (inline).
   getChase: async (chaseId: string): Promise<Chase> => {
     try {
-      return await request<Chase>(`/chases/${chaseId}`);
+      const chase = await request<Partial<Chase> & { id: string }>(`/hunt/${chaseId}`);
+      return normalizeChase(chase);
     } catch {
       const chase = mockChases.find((item) => item.id === chaseId);
       if (!chase) {
@@ -178,11 +218,49 @@ export const chaseApi = {
     }
   },
 
+  // POST /hunt/join {huntId} — rejoindre une chasse active.
+  joinHunt: async (huntId: string): Promise<void> => {
+    await request<void>('/hunt/join', {
+      method: 'POST',
+      body: JSON.stringify({ huntId }),
+    });
+  },
+
+  // POST /hunt/leave {huntId} — quitter une chasse rejointe.
+  leaveHunt: async (huntId: string): Promise<void> => {
+    await request<void>('/hunt/leave', {
+      method: 'POST',
+      body: JSON.stringify({ huntId }),
+    });
+  },
+
+  // GET /hunt/joined — chasses rejointes non terminées.
+  getJoinedHunts: async (): Promise<Chase[]> => {
+    try {
+      const response = await request<unknown>('/hunt/joined');
+      return normalizeChasesResponse(response);
+    } catch {
+      return [];
+    }
+  },
+
+  // Démarrage côté joueur : rejoint la chasse via le contrat (/hunt/join) puis
+  // construit la progression locale (le suivi par étape reste local au mobile).
   startChase: async (chaseId: string): Promise<UserProgress> => {
     try {
-      return await request<UserProgress>(`/chases/${chaseId}/start`, {
-        method: 'POST',
-      });
+      await chaseApi.joinHunt(chaseId);
+      const chase = await chaseApi.getChase(chaseId);
+      const progress: UserProgress = {
+        userId: 'mobile-user',
+        chaseId,
+        currentStep: 1,
+        totalSteps: chase.steps.length,
+        pointsEarned: 0,
+        startedAt: new Date().toISOString(),
+        stepProgress: chase.steps.map((step) => ({ stepId: step.id, completed: false })),
+      };
+      fallbackProgressStore.set(chaseId, progress);
+      return progress;
     } catch {
       const chase = await chaseApi.getChase(chaseId);
       const progress: UserProgress = {
@@ -268,11 +346,15 @@ export const chaseApi = {
       return { pointsEarned: progress?.pointsEarned ?? 0 };
     }
   },
+  // POST /hunt — contrat : {title, description, image, partnerId, difficulty,
+  // estimatedDuration, status?, steps[]} (admin/partner). On mappe l'objet
+  // `partner` local vers `partnerId` attendu par l'API.
   createChase: async (payload: Partial<Chase>): Promise<Chase> => {
     try {
-      return await request<Chase>('/chases', {
+      const { partner, ...rest } = payload;
+      return await request<Chase>('/hunt', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...rest, partnerId: partner?.id }),
       });
     } catch {
       // Fallback: create a local draft chase
@@ -306,10 +388,11 @@ export const chaseApi = {
     }
   },
 
+  // PATCH /hunt/{id} — mise à jour partielle (admin ou propriétaire).
   updateChase: async (chaseId: string, payload: Partial<Chase>): Promise<Chase> => {
     try {
-      return await request<Chase>(`/chases/${chaseId}`, {
-        method: 'PUT',
+      return await request<Chase>(`/hunt/${chaseId}`, {
+        method: 'PATCH',
         body: JSON.stringify(payload),
       });
     } catch {
@@ -334,5 +417,11 @@ export const chaseApi = {
 
       return updated;
     }
+  },
+
+  // DELETE /hunt/{id} — suppression (admin ou propriétaire). Pas de fallback
+  // mock : une suppression "simulée" serait trompeuse.
+  deleteChase: async (chaseId: string): Promise<void> => {
+    await request<void>(`/hunt/${chaseId}`, { method: 'DELETE' });
   },
 };

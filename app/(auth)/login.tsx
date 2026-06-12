@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Linking } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useAuth } from '@/src/state/AuthContext';
 import { useDemo } from '@/src/state/DemoContext';
 import { colors, glassCard, radii } from '@/src/theme';
+
+// Connexion passkey : WebAuthn n'existe pas en natif dans Expo Go, on suit donc
+// le standard RFC 8252 — navigateur système vers la page web dédiée, qui
+// authentifie la passkey du domaine puis renvoie le JWT par deep link
+// (lootopia://auth/callback?token=...), géré par app/auth/callback.tsx.
+// La page web `/auth/mobile` doit lire `redirect_uri` et y rediriger le token.
+const WEB_APP_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'http://localhost:3000';
+const PASSKEY_LOGIN_URL = `${WEB_APP_URL}/auth/mobile?redirect_uri=${encodeURIComponent('lootopia://auth/callback')}`;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -43,8 +51,8 @@ export default function LoginScreen() {
           await verifyTotp(code);
           router.replace('/(tabs)/chases');
         } else {
-          // L'API exige une passkey (WebAuthn) : non disponible dans Expo Go.
-          setError('Cette connexion exige une passkey, non disponible sur l’app mobile (Expo Go).');
+          // L'API exige une passkey (WebAuthn) : on passe par le navigateur.
+          setInfo('Cette connexion exige une passkey — utilise le bouton ci-dessous.');
         }
         return;
       }
@@ -55,7 +63,7 @@ export default function LoginScreen() {
       } else if (pendingMethods.includes('totp')) {
         setInfo('Un code TOTP est requis pour terminer la connexion.');
       } else {
-        setInfo('Une passkey est requise pour ce compte (non disponible sur mobile).');
+        setInfo('Une passkey est requise pour ce compte — utilise le bouton passkey ci-dessous.');
       }
     } catch (authError: any) {
       showAuthError(authError);
@@ -96,6 +104,17 @@ export default function LoginScreen() {
     clearMfaState();
     setCode('');
     setInfo(null);
+  };
+
+  const handlePasskeyLogin = async () => {
+    try {
+      setError(null);
+      // Navigateur système (jamais une WebView : les passkeys y sont bloquées
+      // et c'est la recommandation RFC 8252). Le retour se fait par deep link.
+      await Linking.openURL(PASSKEY_LOGIN_URL);
+    } catch {
+      setError('Impossible d’ouvrir le navigateur pour la connexion passkey.');
+    }
   };
 
   return (
@@ -144,6 +163,25 @@ export default function LoginScreen() {
           <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
             <Text style={styles.buttonText}>{loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
           </Pressable>
+
+          {loginStage === 'credentials' && (
+            <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
+              Mot de passe oublié ?
+            </Link>
+          )}
+
+          <View style={styles.separatorRow}>
+            <View style={styles.separatorLine} />
+            <Text style={styles.separatorText}>ou</Text>
+            <View style={styles.separatorLine} />
+          </View>
+
+          <Pressable style={[styles.passkeyButton, isLoading && styles.buttonDisabled]} onPress={handlePasskeyLogin} disabled={isLoading}>
+            <Text style={styles.passkeyButtonText}>🔑 Se connecter avec une passkey</Text>
+          </Pressable>
+          <Text style={styles.passkeyHint}>
+            S’ouvre dans le navigateur : ta passkey du site Lootopia (Face ID / empreinte) te reconnecte ici automatiquement.
+          </Text>
         </>
       )}
 
@@ -183,6 +221,13 @@ const styles = StyleSheet.create({
   demoButtonActive: { backgroundColor: colors.goldSoft, borderStyle: 'solid' },
   demoButtonText: { color: colors.gold, fontWeight: '700', fontSize: 14 },
   demoButtonTextActive: { color: colors.gold },
+  forgotLink: { textAlign: 'right', marginTop: 10, color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  separatorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 6 },
+  separatorLine: { flex: 1, height: 1, backgroundColor: colors.glassBorderStrong },
+  separatorText: { color: colors.textFaint, fontSize: 12, fontWeight: '700' },
+  passkeyButton: { borderColor: colors.teal, borderWidth: 1, backgroundColor: colors.tealSoft, paddingVertical: 14, borderRadius: radii.md, alignItems: 'center', marginTop: 8 },
+  passkeyButtonText: { color: colors.teal, fontWeight: '900', fontSize: 15 },
+  passkeyHint: { color: colors.textFaint, fontSize: 11, textAlign: 'center', marginTop: 8, lineHeight: 16 },
   error: { color: colors.danger, marginBottom: 8 },
   info: { color: colors.teal, marginBottom: 8 },
   linkButton: { marginTop: 10 },

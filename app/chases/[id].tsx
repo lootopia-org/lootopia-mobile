@@ -105,12 +105,16 @@ export default function ChaseDetailScreen() {
         <Text style={styles.sectionTitle}>Carte</Text>
         <ChaseMap
           center={chase.location}
-          markers={chase.steps.map((step, index) => ({
-            latitude: step.location.latitude,
-            longitude: step.location.longitude,
-            title: step.title,
-            description: step.clue,
-          }))}
+          // Seules les étapes géolocalisées (checkpoint) ont une position ;
+          // les étapes "riddle" (réponse) n'apparaissent pas sur la carte.
+          markers={chase.steps
+            .filter((step) => step.location)
+            .map((step) => ({
+              latitude: step.location!.latitude,
+              longitude: step.location!.longitude,
+              title: step.title,
+              description: step.clue,
+            }))}
         />
       </View>
 

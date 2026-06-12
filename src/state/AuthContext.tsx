@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
-import { authApi, type User, type UserRole } from '@/src/lib/auth-api';
+import { authApi, type RegisterPayload, type User, type UserRole } from '@/src/lib/auth-api';
 
 type LoginStage = 'credentials' | 'mfa';
 
@@ -9,15 +9,25 @@ type AuthContextValue = {
   user: User | null;
   isReady: boolean;
   isAuthenticated: boolean;
+  // Token de session courant (null si déconnecté, DEMO_TOKEN en mode démo).
+  // Exposé pour les écrans qui appellent les endpoints authentifiés
+  // (TOTP enroll/disable, liste des passkeys...).
+  token: string | null;
+  isDemoSession: boolean;
   loginStage: LoginStage;
   pendingToken: string | null;
   pendingMethods: Array<'totp' | 'webauthn'>;
   emailNotVerified: boolean;
   signIn: (email: string, password: string) => Promise<{ mfaRequired: boolean }>;
   signInDemo: (role?: UserRole) => Promise<void>;
+  // Connexion par token déjà émis (retour du flow passkey via navigateur :
+  // la page web authentifie en WebAuthn puis renvoie le JWT par deep link).
+  signInWithToken: (token: string) => Promise<void>;
   verifyTotp: (code: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
-  signUp: (payload: { email: string; password: string }) => Promise<void>;
+  signUp: (payload: RegisterPayload) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearMfaState: () => void;
 };
@@ -113,6 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isReady,
       isAuthenticated: Boolean(user && token),
+      token,
+      isDemoSession: token === DEMO_TOKEN,
       loginStage,
       pendingToken,
       pendingMethods,
@@ -144,6 +156,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPendingMethods([]);
         await persistPendingToken(null);
       },
+      signInWithToken: async (nextToken: string) => {
+        // Le token vient du deep link : on le valide auprès de l'API avant de
+        // le persister (un token invalide/expiré lève et n'ouvre pas de session).
+        const refreshedUser = await authApi.me(nextToken);
+        await persistToken(nextToken);
+        await persist(refreshedUser);
+        setLoginStage('credentials');
+        setPendingMethods([]);
+        await persistPendingToken(null);
+      },
       verifyTotp: async (code: string) => {
         if (!pendingToken) {
           throw new Error('Missing pending token');
@@ -160,8 +182,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resendVerification: async (email: string) => {
         await authApi.resendVerification(email);
       },
-      signUp: async ({ email, password }) => {
-        await authApi.register(email, password);
+      signUp: async (payload: RegisterPayload) => {
+        await authApi.register(payload);
+      },
+      forgotPassword: async (email: string) => {
+        await authApi.forgotPassword(email);
+      },
+      resetPassword: async (resetToken: string, newPassword: string) => {
+        await authApi.resetPassword(resetToken, newPassword);
       },
       signOut: async () => {
         if (token) {

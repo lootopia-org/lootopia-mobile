@@ -5,12 +5,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ARExperience } from '@/src/components/ARExperience';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import { profileApi } from '@/src/lib/profile-api';
+import { useAuth } from '@/src/state/AuthContext';
+import { useHunts } from '@/src/state/HuntsContext';
+import { useLiveOps } from '@/src/state/LiveOpsContext';
 import { colors, radii } from '@/src/theme';
 
 export default function ARScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id, clue, stepId } = useLocalSearchParams<{ id: string; clue?: string; stepId?: string }>();
+  const { getStepOverride, isHuntLivePaused } = useLiveOps();
+  const { token, isDemoSession } = useAuth();
+  const { acceptedHunts, completeStep: completeStepLocally } = useHunts();
   const [chase, setChase] = useState<Chase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -38,6 +45,21 @@ export default function ARScreen() {
     // On valide côté API mais on reste sur l'écran : le joueur voit le coffre
     // s'ouvrir, puis revient avec le bouton retour.
     await chaseApi.completeStep(chase.id, step.id);
+    // Progression locale (liste "En cours").
+    await completeStepLocally(chase.id, step.id);
+
+    // Dernière étape ? PATCH /profile {huntId} crédite les points de la chasse.
+    const alreadyDone = acceptedHunts[chase.id]?.completedStepIds ?? [];
+    const doneAfter = new Set([...alreadyDone, step.id]);
+    const isHuntComplete = chase.steps.every((item) => doneAfter.has(item.id));
+    if (isHuntComplete && token && !isDemoSession) {
+      try {
+        await profileApi.completeHunt(token, chase.id);
+      } catch {
+        // Best-effort : la complétion locale reste acquise même si le serveur
+        // est injoignable ; les points seront re-crédités au prochain passage.
+      }
+    }
   };
 
   if (isLoading) {
@@ -64,6 +86,17 @@ export default function ARScreen() {
         targetLocation={step?.location ?? { latitude: 43.2965, longitude: 5.3698 }}
         radiusMeters={step?.radiusMeters ?? 100}
         qrPayload={step?.qrPayload}
+        photoClueUri={step?.photoClueUri}
+        audioHintUri={step?.audioHintUri}
+        liveOverride={
+          step
+            ? {
+                huntPaused: isHuntLivePaused(chase.id),
+                stepPaused: getStepOverride(chase.id, step.id)?.paused,
+                redirect: getStepOverride(chase.id, step.id)?.redirect,
+              }
+            : undefined
+        }
         fullScreen
         onComplete={handleComplete}
       />

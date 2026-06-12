@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { chaseApi } from '@/src/lib/chase-api';
 
 export type AvatarModel = 'male' | 'female';
 
 type HuntProgress = {
   acceptedAt: string;
   completedStepIds: string[];
+  // Pause côté joueur : la chasse reste dans "En cours" mais gelée.
+  paused?: boolean;
 };
 
 type HuntsContextValue = {
@@ -15,6 +18,7 @@ type HuntsContextValue = {
   acceptHunt: (huntId: string) => Promise<void>;
   abandonHunt: (huntId: string) => Promise<void>;
   completeStep: (huntId: string, stepId: string) => Promise<void>;
+  setHuntPaused: (huntId: string, paused: boolean) => Promise<void>;
   isAccepted: (huntId: string) => boolean;
   setAvatarModel: (model: AvatarModel) => Promise<void>;
 };
@@ -59,6 +63,13 @@ export function HuntsProvider({ children }: { children: React.ReactNode }) {
     if (acceptedHunts[huntId]) {
       return;
     }
+    // Contrat : POST /hunt/join {huntId}. Best-effort — l'acceptation locale
+    // reste valable hors-ligne / en mode démo (mock fallback côté API).
+    try {
+      await chaseApi.joinHunt(huntId);
+    } catch {
+      // hors-ligne ou mode démo : on garde l'état local
+    }
     await persist({
       ...acceptedHunts,
       [huntId]: { acceptedAt: new Date().toISOString(), completedStepIds: [] },
@@ -66,6 +77,12 @@ export function HuntsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const abandonHunt = async (huntId: string) => {
+    // Contrat : POST /hunt/leave {huntId}, en best-effort également.
+    try {
+      await chaseApi.leaveHunt(huntId);
+    } catch {
+      // idem : l'abandon local prime
+    }
     const next = { ...acceptedHunts };
     delete next[huntId];
     await persist(next);
@@ -82,6 +99,14 @@ export function HuntsProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const setHuntPaused = async (huntId: string, paused: boolean) => {
+    const progress = acceptedHunts[huntId];
+    if (!progress) {
+      return;
+    }
+    await persist({ ...acceptedHunts, [huntId]: { ...progress, paused } });
+  };
+
   const setAvatarModel = async (model: AvatarModel) => {
     setAvatarModelState(model);
     await AsyncStorage.setItem(AVATAR_KEY, model);
@@ -95,6 +120,7 @@ export function HuntsProvider({ children }: { children: React.ReactNode }) {
       acceptHunt,
       abandonHunt,
       completeStep,
+      setHuntPaused,
       isAccepted: (huntId: string) => Boolean(acceptedHunts[huntId]),
       setAvatarModel,
     }),
