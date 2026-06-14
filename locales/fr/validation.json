@@ -1,0 +1,62 @@
+{
+  "huntTitleMin": "Titre : 3 caractères minimum",
+  "huntDescriptionMin": "Description : 10 caractères minimum",
+  "huntStepsRequired": "Ajoute au moins une étape",
+  "stepTitleRequired": "Étape {index} : titre requis",
+  "stepDescriptionRequired": "Étape {index} : description requise",
+  "stepCoordinatesRequired": "Étape {index} : coordonnées requises",
+  "stepPhotoReferenceRequired": "Étape {index} : photo de référence requise",
+  "hunt": {
+    "basics": {
+      "titleMin": "Le titre doit contenir au moins 3 caractères",
+      "descriptionMin": "La description doit contenir au moins 10 caractères",
+      "imageInvalid": "Téléversez une image ou fournissez une URL d’image valide",
+      "partnerIdRequired": "L’ID partenaire est requis"
+    },
+    "step": {
+      "titleRequired": "Le titre est requis",
+      "descriptionRequired": "La description est requise",
+      "pointsInvalidType": "Les points sont requis",
+      "pointsMin": "Les points doivent être d’au moins 1",
+      "locationRequired": "Définissez un emplacement via la recherche d’adresse ou la carte",
+      "photoAnswerRequired": "Ajoutez une photo de référence à reproduire"
+    },
+    "form": {
+      "stepsMin": "Au moins une étape est requise"
+    },
+    "wizard": {
+      "stepsMin": "Au moins une étape est requise"
+    }
+  },
+  "auth": {
+    "login": {
+      "emailInvalid": "Email invalide",
+      "passwordMin": "Le mot de passe doit contenir au moins 8 caractères"
+    },
+    "register": {
+      "usernameMin": "Le nom d’utilisateur doit contenir au moins 3 caractères",
+      "emailInvalid": "Email invalide",
+      "passwordMin": "Le mot de passe doit contenir au moins 8 caractères",
+      "usernameRequired": "Choisis un pseudo."
+    },
+    "totp": {
+      "codeLength": "Le code doit contenir 6 chiffres"
+    },
+    "resetPassword": {
+      "newPasswordMin": "Le mot de passe doit contenir au moins 8 caractères",
+      "passwordMinLength": "Le mot de passe doit faire au moins 8 caractères.",
+      "passwordMismatch": "Les deux mots de passe ne correspondent pas.",
+      "invalidToken": "Lien invalide ou expiré. Redemande un email de réinitialisation.",
+      "genericFailed": "Réinitialisation impossible. Réessaie plus tard."
+    },
+    "forgotPassword": {
+      "emailInvalid": "Email invalide"
+    }
+  },
+  "stepAnswer": {
+    "incorrect": "Réponse incorrecte"
+  },
+  "stepPhoto": {
+    "notRecognized": "Photo non reconnue"
+  }
+}

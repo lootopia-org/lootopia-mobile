@@ -1,8 +1,12 @@
-import * as SecureStore from 'expo-secure-store';
-import { chases as mockChases } from '@/src/data/mock';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api';
-const TOKEN_KEY = 'lootopia-mobile-token';
+import { apiRequest } from '@/src/lib/api-client';
+import {
+  fromApiHunt,
+  toCreateHuntPayload,
+  toUpdateHuntPayload,
+  toApiStep,
+  type ApiHuntRaw,
+} from '@/src/lib/hunt-mappers';
+import type { HuntForm, HuntStepForm } from '@/src/lib/hunt-types';
 
 export type Partner = {
   id: string;
@@ -27,16 +31,22 @@ export type ChaseStep = {
   title: string;
   description: string;
   clue: string;
-  location: {
+  type?: import('@/src/lib/hunt-types').HuntStepType;
+  answer?: string;
+  points?: number;
+  location?: {
     latitude: number;
     longitude: number;
   };
   arContent?: ARContent;
   reward?: number;
   completed: boolean;
-  // Champs propres au mobile : rayon de proximité GPS + indice affiché en AR.
   radiusMeters?: number;
   arHint?: string;
+  qrPayload?: string;
+  scanInAr?: boolean;
+  photoClueUri?: string;
+  audioHintUri?: string;
 };
 
 export type Chase = {
@@ -44,6 +54,7 @@ export type Chase = {
   title: string;
   description: string;
   image?: string;
+  partnerId: string;
   partner: Partner;
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedDuration: number;
@@ -53,7 +64,7 @@ export type Chase = {
   };
   createdAt: string;
   updatedAt: string;
-  status: 'active' | 'draft' | 'archived';
+  status: 'active' | 'draft' | 'archived' | 'paused';
   participants: number;
   rating: number;
   steps: ChaseStep[];
@@ -77,259 +88,217 @@ export type UserProgress = {
   stepProgress: StepProgress[];
 };
 
-type ApiError = {
-  message?: string;
-};
+const localProgressStore = new Map<string, UserProgress>();
 
-const fallbackProgressStore = new Map<string, UserProgress>();
-
-// Les données mock partagent désormais la même forme `Chase` que l'API (voir
-// src/data/mock.ts, alignées sur le frontend web) : plus besoin de normaliser.
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
-
-const parseJson = async <T,>(response: Response): Promise<T> => {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    return (await response.json()) as T;
-  }
-
-  return {} as T;
-};
-
-const getToken = async () => SecureStore.getItemAsync(TOKEN_KEY);
-
-const request = async <T,>(path: string, init: RequestInit = {}) => {
-  const token = await getToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const body = await parseJson<ApiError>(response);
-    throw new Error(body.message || 'Request failed');
-  }
-
-  return parseJson<T>(response);
-};
+const normalizeChase = (raw: ApiHuntRaw): Chase => fromApiHunt(raw);
 
 const normalizeChasesResponse = (response: unknown): Chase[] => {
+  let list: unknown[] = [];
   if (Array.isArray(response)) {
-    return response as Chase[];
+    list = response;
+  } else if (
+    response &&
+    typeof response === 'object' &&
+    'data' in response &&
+    Array.isArray((response as { data: unknown[] }).data)
+  ) {
+    list = (response as { data: unknown[] }).data;
   }
 
-  if (response && typeof response === 'object' && 'data' in response && Array.isArray((response as { data: Chase[] }).data)) {
-    return (response as { data: Chase[] }).data;
-  }
-
-  return [];
+  return list
+    .filter((item): item is ApiHuntRaw => Boolean(item && typeof item === 'object' && 'id' in item))
+    .map(normalizeChase);
 };
 
-const ensureFallbackProgress = (chase: Chase) => {
-  const existing = fallbackProgressStore.get(chase.id);
-  if (existing) {
-    return existing;
-  }
-
-  return null;
-};
+const buildLocalProgress = (chase: Chase): UserProgress => ({
+  userId: 'me',
+  chaseId: chase.id,
+  currentStep: 1,
+  totalSteps: chase.steps.length,
+  pointsEarned: 0,
+  startedAt: new Date().toISOString(),
+  stepProgress: chase.steps.map((step) => ({ stepId: step.id, completed: false })),
+});
 
 export const chaseApi = {
   getChases: async (): Promise<Chase[]> => {
-    try {
-      const response = await request<unknown>('/chases');
-      return normalizeChasesResponse(response);
-    } catch {
-      return clone(mockChases);
-    }
+    const response = await apiRequest<unknown>('/hunt');
+    return normalizeChasesResponse(response);
+  },
+
+  getManagedChases: async (partnerId?: string): Promise<Chase[]> => {
+    const response = await apiRequest<unknown>('/hunt?all=true');
+    const hunts = normalizeChasesResponse(response);
+    const owned = partnerId ? hunts.filter((chase) => chase.partnerId === partnerId) : hunts;
+    return owned.filter((chase) => chase.status !== 'archived');
+  },
+
+  pauseChase: async (chaseId: string): Promise<Chase> => {
+    return chaseApi.updateChase(chaseId, { status: 'paused' });
+  },
+
+  resumeChase: async (chaseId: string): Promise<Chase> => {
+    return chaseApi.updateChase(chaseId, { status: 'active' });
   },
 
   getChase: async (chaseId: string): Promise<Chase> => {
-    try {
-      return await request<Chase>(`/chases/${chaseId}`);
-    } catch {
-      const chase = mockChases.find((item) => item.id === chaseId);
-      if (!chase) {
-        throw new Error('Chase not found');
-      }
-
-      return clone(chase);
-    }
+    const chase = await apiRequest<ApiHuntRaw>(`/hunt/${chaseId}`);
+    return normalizeChase(chase);
   },
 
-  getProgress: async (chaseId: string): Promise<UserProgress | null> => {
+  joinHunt: async (huntId: string): Promise<void> => {
     try {
-      return await request<UserProgress>(`/chases/${chaseId}/progress`);
-    } catch {
-      const chase = mockChases.find((item) => item.id === chaseId);
-      if (!chase) {
-        return null;
-      }
-
-      const progress = ensureFallbackProgress(chase);
-      return progress ?? null;
-    }
-  },
-
-  startChase: async (chaseId: string): Promise<UserProgress> => {
-    try {
-      return await request<UserProgress>(`/chases/${chaseId}/start`, {
+      await apiRequest<void>('/hunt/join', {
         method: 'POST',
+        body: JSON.stringify({ huntId }),
       });
-    } catch {
-      const chase = await chaseApi.getChase(chaseId);
-      const progress: UserProgress = {
-        userId: 'mobile-user',
-        chaseId,
-        currentStep: 1,
-        totalSteps: chase.steps.length,
-        pointsEarned: 0,
-        startedAt: new Date().toISOString(),
-        stepProgress: chase.steps.map((step) => ({ stepId: step.id, completed: false })),
-      };
-
-      fallbackProgressStore.set(chaseId, progress);
-      return progress;
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      if (status === 409) {
+        return;
+      }
+      throw error;
     }
   },
 
-  completeStep: async (chaseId: string, stepId: string): Promise<ChaseStep> => {
+  leaveHunt: async (huntId: string): Promise<void> => {
     try {
-      return await request<ChaseStep>(`/chases/${chaseId}/steps/${stepId}/complete`, {
+      await apiRequest<void>('/hunt/leave', {
         method: 'POST',
+        body: JSON.stringify({ huntId }),
       });
-    } catch {
-      const chase = await chaseApi.getChase(chaseId);
-      const step = chase.steps.find((item) => item.id === stepId);
-
-      if (!step) {
-        throw new Error('Step not found');
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      if (status === 409) {
+        return;
       }
-
-      const nextProgress = fallbackProgressStore.get(chaseId) ?? (await chaseApi.startChase(chaseId));
-      const updatedProgress: UserProgress = {
-        ...nextProgress,
-        stepProgress: nextProgress.stepProgress.map((progressStep) =>
-          progressStep.stepId === stepId
-            ? { ...progressStep, completed: true, completedAt: new Date().toISOString() }
-            : progressStep
-        ),
-      };
-
-      updatedProgress.currentStep = Math.min(
-        updatedProgress.stepProgress.filter((progressStep) => progressStep.completed).length + 1,
-        updatedProgress.totalSteps
-      );
-      updatedProgress.pointsEarned += step.reward ?? 10;
-
-      fallbackProgressStore.set(chaseId, updatedProgress);
-      return { ...step, completed: true };
+      throw error;
     }
+  },
+
+  getJoinedHuntIds: async (): Promise<string[]> => {
+    const hunts = await chaseApi.getJoinedHunts();
+    return hunts.map((hunt) => hunt.id);
+  },
+
+  getJoinedHunts: async (): Promise<Chase[]> => {
+    const response = await apiRequest<unknown>('/hunt/joined');
+    return normalizeChasesResponse(response);
+  },
+
+  getCompletedHunts: async (): Promise<Chase[]> => {
+    const response = await apiRequest<unknown>('/hunt/completed');
+    return normalizeChasesResponse(response);
+  },
+
+  getCompletedStepIds: async (huntId: string): Promise<string[]> => {
+    const response = await apiRequest<unknown>(`/hunt/step/completed/${huntId}`);
+    if (!Array.isArray(response)) {
+      return [];
+    }
+    return response
+      .map((step) => {
+        if (!step || typeof step !== 'object') {
+          return undefined;
+        }
+        const id = (step as { id?: string }).id;
+        return typeof id === 'string' && id.length > 0 ? id : undefined;
+      })
+      .filter((id): id is string => Boolean(id));
+  },
+
+  getProgress: async (chaseId: string): Promise<UserProgress | null> =>
+    localProgressStore.get(chaseId) ?? null,
+
+  startChase: async (chaseId: string, alreadyJoined = false): Promise<UserProgress> => {
+    if (!alreadyJoined) {
+      await chaseApi.joinHunt(chaseId);
+    }
+    const chase = await chaseApi.getChase(chaseId);
+    const progress = buildLocalProgress(chase);
+    localProgressStore.set(chaseId, progress);
+    return progress;
+  },
+
+  completeStep: async (chaseId: string, stepId: string, answer?: string): Promise<ChaseStep> => {
+    await apiRequest(`/hunt/step/complete/${stepId}`, {
+      method: 'POST',
+      body: JSON.stringify({ answer: answer?.trim() || null }),
+    });
+
+    const chase = await chaseApi.getChase(chaseId);
+    const step = chase.steps.find((item) => item.id === stepId);
+    if (!step) {
+      throw new Error('Étape introuvable');
+    }
+
+    const progress = localProgressStore.get(chaseId) ?? buildLocalProgress(chase);
+    const updated: UserProgress = {
+      ...progress,
+      stepProgress: progress.stepProgress.map((item) =>
+        item.stepId === stepId ? { ...item, completed: true, completedAt: new Date().toISOString() } : item
+      ),
+    };
+    updated.currentStep = Math.min(
+      updated.stepProgress.filter((item) => item.completed).length + 1,
+      updated.totalSteps
+    );
+    updated.pointsEarned += step.points ?? step.reward ?? 10;
+    localProgressStore.set(chaseId, updated);
+
+    return { ...step, completed: true };
   },
 
   interactAR: async (chaseId: string, stepId: string): Promise<{ success: boolean; progress: UserProgress | null }> => {
-    try {
-      return await request<{ success: boolean; progress: UserProgress | null }>(
-        `/chases/${chaseId}/steps/${stepId}/ar-interact`,
-        { method: 'POST' }
-      );
-    } catch {
-      const progress = fallbackProgressStore.get(chaseId);
-      if (!progress) {
-        return { success: true, progress: null };
-      }
-
-      const nextProgress: UserProgress = {
-        ...progress,
-        stepProgress: progress.stepProgress.map((progressStep) =>
-          progressStep.stepId === stepId ? { ...progressStep, arInteraction: true } : progressStep
-        ),
-      };
-
-      fallbackProgressStore.set(chaseId, nextProgress);
-      return { success: true, progress: nextProgress };
+    const progress = localProgressStore.get(chaseId);
+    if (!progress) {
+      return { success: true, progress: null };
     }
+    const updated: UserProgress = {
+      ...progress,
+      stepProgress: progress.stepProgress.map((item) =>
+        item.stepId === stepId ? { ...item, arInteraction: true } : item
+      ),
+    };
+    localProgressStore.set(chaseId, updated);
+    return { success: true, progress: updated };
   },
 
   completeChase: async (chaseId: string): Promise<{ pointsEarned: number }> => {
-    try {
-      return await request<{ pointsEarned: number }>(`/chases/${chaseId}/complete`, {
-        method: 'POST',
-      });
-    } catch {
-      const progress = fallbackProgressStore.get(chaseId);
-      return { pointsEarned: progress?.pointsEarned ?? 0 };
-    }
+    const progress = localProgressStore.get(chaseId);
+    return { pointsEarned: progress?.pointsEarned ?? 0 };
   },
-  createChase: async (payload: Partial<Chase>): Promise<Chase> => {
-    try {
-      return await request<Chase>('/chases', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      // Fallback: create a local draft chase
-      const id = `local-${Math.random().toString(36).slice(2, 9)}`;
-      const now = new Date().toISOString();
-      const chase: Chase = {
-        id,
-        title: payload.title ?? 'Nouvelle chasse',
-        description: payload.description ?? '',
-        image: payload.image,
-        partner: payload.partner ?? {
-          id: `partner-${id}`,
-          name: 'Mobile Partner',
-          email: 'partner@local',
-          description: '',
-          logo: '',
-          chases: [],
-        },
-        difficulty: (payload.difficulty as Chase['difficulty']) ?? 'easy',
-        estimatedDuration: payload.estimatedDuration ?? 30,
-        location: payload.location ?? { latitude: 43.2965, longitude: 5.3698 },
-        createdAt: now,
-        updatedAt: now,
-        status: 'draft',
-        participants: 0,
-        rating: 0,
-        steps: payload.steps ?? [],
-      };
 
-      return chase;
-    }
+  createChase: async (form: HuntForm, partnerId?: string): Promise<Chase> => {
+    const chase = await apiRequest<ApiHuntRaw>('/hunt', {
+      method: 'POST',
+      body: JSON.stringify(toCreateHuntPayload(form, partnerId)),
+    });
+    return normalizeChase(chase);
   },
 
   updateChase: async (chaseId: string, payload: Partial<Chase>): Promise<Chase> => {
-    try {
-      return await request<Chase>(`/chases/${chaseId}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload),
-      });
-    } catch {
-      // Fallback: attempt to fetch chase and merge changes locally
-      const existing = await (async () => {
-        try {
-          return await chaseApi.getChase(chaseId);
-        } catch {
-          return null;
-        }
-      })();
+    const chase = await apiRequest<ApiHuntRaw>(`/hunt/${chaseId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return normalizeChase(chase);
+  },
 
-      if (!existing) {
-        throw new Error('Chase not found');
-      }
+  syncHuntSteps: async (huntId: string, steps: HuntStepForm[]): Promise<Chase> => {
+    await apiRequest(`/hunt/${huntId}/steps/sync`, {
+      method: 'PUT',
+      body: JSON.stringify({ steps: steps.map(toApiStep) }),
+    });
+    return chaseApi.getChase(huntId);
+  },
 
-      const updated: Chase = {
-        ...existing,
-        ...payload,
-        updatedAt: new Date().toISOString(),
-      } as Chase;
+  saveHuntEdit: async (huntId: string, form: HuntForm): Promise<Chase> => {
+    await chaseApi.updateChase(huntId, toUpdateHuntPayload(form));
+    return chaseApi.syncHuntSteps(huntId, form.steps);
+  },
 
-      return updated;
-    }
+  deleteChase: async (chaseId: string): Promise<void> => {
+    await apiRequest<void>(`/hunt/${chaseId}`, { method: 'DELETE' });
   },
 };

@@ -1,0 +1,126 @@
+{
+  "studio": {
+    "heading": "Studio partenaire",
+    "subhead": "Créez et gérez vos chasses au trésor",
+    "newHunt": "Nouvelle chasse",
+    "empty": "Aucune chasse. Créez votre première aventure !",
+    "createHunt": "Créer une chasse",
+    "tooltips": {
+      "resumeHunt": "Reprendre la chasse",
+      "pauseHunt": "Mettre en pause"
+    }
+  },
+  "editor": {
+    "newHunt": "Nouvelle chasse",
+    "editHunt": "Modifier",
+    "huntSection": "Chasse",
+    "difficulty": "Difficulté",
+    "durationMinutes": "Durée (min)",
+    "status": "Statut",
+    "stepsSection": "Étapes ({count})",
+    "addStep": "+ Ajouter",
+    "currentLocation": "📍 Position actuelle",
+    "points": "Points",
+    "deleteHunt": "Supprimer la chasse",
+    "deleteConfirmTitle": "Supprimer",
+    "deleteConfirmMessage": "Cette chasse sera supprimée définitivement.",
+    "photoReference": {
+      "hint": "Photo de référence requise",
+      "capture": "Capturer",
+      "retake": "Reprendre",
+      "errors": {
+        "cameraDenied": "Permission caméra refusée.",
+        "captureFailed": "Capture échouée",
+        "uploadFailed": "Upload échoué"
+      }
+    }
+  },
+  "hunts": {
+    "header": "Mes chasses",
+    "empty": "Aucune chasse",
+    "untitled": "Sans titre",
+    "status": {
+      "active": "Active",
+      "draft": "Brouillon",
+      "paused": "En pause"
+    },
+    "cardMeta": "{stepCount} étape{suffix} · {status}",
+    "editLoadError": "Chasse introuvable",
+    "accessDenied": "Accès réservé aux organisateurs",
+    "title": "Mes chasses",
+    "stepsMeta": "{count} étapes · {status}"
+  },
+  "field": {
+    "header": "Terrain",
+    "segments": {
+      "creation": "Création",
+      "liveops": "Live ops",
+      "heatmap": "Heatmap"
+    },
+    "creation": {
+      "myHunts": "Mes chasses",
+      "newHuntHere": "Nouvelle chasse ici",
+      "errors": {
+        "locationDenied": "Permission localisation refusée.",
+        "gpsUnavailable": "Position GPS indisponible."
+      }
+    },
+    "liveops": {
+      "empty": "Aucune chasse",
+      "meta": "{stepCount} étape{suffix} · {participants} participants",
+      "huntPause": {
+        "suspend": "Suspendre",
+        "resume": "Reprendre",
+        "badge": "En pause"
+      },
+      "expandSteps": {
+        "show": "Étapes ▼",
+        "hide": "Masquer ▲"
+      },
+      "stepActions": {
+        "suspend": "Suspendre",
+        "resume": "Reprendre",
+        "cancelRedirect": "Annuler",
+        "redirectHere": "Rediriger ici"
+      },
+      "redirectLabel": "→ {lat},{lng}",
+      "errors": {
+        "modifyFailed": "Modification impossible.",
+        "locationDenied": "Permission localisation refusée.",
+        "gpsUnavailable": "Position GPS indisponible."
+      }
+    },
+    "heatmap": {
+      "stats": {
+        "cells": "Cellules",
+        "points": "Points"
+      },
+      "empty": "Aucune donnée",
+      "clear": "Effacer"
+    },
+    "photoClueCapture": {
+      "buttonNew": "📷 Photo secrète",
+      "buttonRetake": "📷 Reprendre la photo secrète",
+      "errors": {
+        "cameraDenied": "Camera permission denied.",
+        "locationDenied": "Location permission denied.",
+        "tooFar": "Approche-toi à moins de 15 m du point (tu es à {distance}).",
+        "gpsUnavailable": "Position GPS indisponible — réessaie en extérieur.",
+        "captureFailed": "Échec de la capture, réessaie."
+      }
+    },
+    "audioHintRecorder": {
+      "recordNew": "🎙 Indice audio 10 s",
+      "rerecord": "🎙 Réenregistrer l'indice audio",
+      "stop": "■ Stop",
+      "recIndicator": "● REC 0:{seconds}",
+      "listen": "▶ Écouter",
+      "errors": {
+        "micDenied": "Permission micro refusée.",
+        "startFailed": "Impossible de démarrer l'enregistrement.",
+        "recordFailed": "Échec de l'enregistrement."
+      }
+    }
+  },
+  "notFound": "Chasse introuvable"
+}

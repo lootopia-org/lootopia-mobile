@@ -1,33 +1,38 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, Linking } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/src/state/AuthContext';
-import { useDemo } from '@/src/state/DemoContext';
+import { colors, glassCard, radii } from '@/src/theme';
+
+const WEB_APP_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'http://localhost:3000';
+const PASSKEY_LOGIN_URL = `${WEB_APP_URL}/auth/mobile?redirect_uri=${encodeURIComponent('lootopia://auth/callback')}`;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, signInDemo, verifyTotp, clearMfaState, loginStage, pendingMethods, resendVerification } = useAuth();
-  const { demoMode, toggleDemo } = useDemo();
+  const { t } = useTranslation(['auth', 'common']);
+  const { signIn, verifyTotp, clearMfaState, loginStage, pendingMethods, resendVerification } = useAuth();
   const [email, setEmail] = useState('player@lootopia.app');
   const [password, setPassword] = useState('password');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Même logique que le web : l'API renvoie des erreurs en texte brut, donc on
-  // branche sur le STATUT HTTP (403 = email non vérifié, 401 = identifiants),
-  // avec repli sur le texte serveur.
   const showAuthError = (authError: any) => {
     const status: number | undefined = authError?.status;
     const text: string = authError?.body ?? authError?.message ?? '';
 
     if (status === 403 || /verif/i.test(text) || /not_verified/i.test(text)) {
-      setError('Ton email n’est pas encore vérifié.');
+      setNeedsVerification(true);
+      setError(t('auth:login.errors.emailNotVerified'));
     } else if (status === 401) {
-      setError('Connexion impossible. Vérifie tes identifiants.');
+      setNeedsVerification(false);
+      setError(t('auth:login.errors.invalidCredentials'));
     } else {
-      setError(text || 'Connexion impossible. Réessaie plus tard.');
+      setNeedsVerification(false);
+      setError(text || t('auth:login.errors.generic'));
     }
   };
 
@@ -42,8 +47,7 @@ export default function LoginScreen() {
           await verifyTotp(code);
           router.replace('/(tabs)/chases');
         } else {
-          // L'API exige une passkey (WebAuthn) : non disponible dans Expo Go.
-          setError('Cette connexion exige une passkey, non disponible sur l’app mobile (Expo Go).');
+          setInfo(t('auth:login.info.passkeyMfaRequired'));
         }
         return;
       }
@@ -52,26 +56,12 @@ export default function LoginScreen() {
       if (!response.mfaRequired) {
         router.replace('/(tabs)/chases');
       } else if (pendingMethods.includes('totp')) {
-        setInfo('Un code TOTP est requis pour terminer la connexion.');
+        setInfo(t('auth:login.info.totpRequired'));
       } else {
-        setInfo('Une passkey est requise pour ce compte (non disponible sur mobile).');
+        setInfo(t('auth:login.info.passkeyRequired'));
       }
     } catch (authError: any) {
       showAuthError(authError);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDemo = async (role: 'admin' | 'partner' | 'player') => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setInfo(null);
-      await signInDemo(role);
-      router.replace('/(tabs)/chases');
-    } catch {
-      setError('Connexion démo impossible.');
     } finally {
       setIsLoading(false);
     }
@@ -83,9 +73,9 @@ export default function LoginScreen() {
       setError(null);
       setInfo(null);
       await resendVerification(email);
-      setInfo('Un nouveau lien de vérification a été envoyé.');
+      setInfo(t('auth:login.info.verificationSent'));
     } catch {
-      setError('Impossible de renvoyer le lien de vérification.');
+      setError(t('auth:login.errors.resendFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -97,91 +87,111 @@ export default function LoginScreen() {
     setInfo(null);
   };
 
+  const handlePasskeyLogin = async () => {
+    try {
+      setError(null);
+      await Linking.openURL(PASSKEY_LOGIN_URL);
+    } catch {
+      setError(t('auth:login.errors.passkeyBrowserFailed'));
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Lootopia Mobile</Text>
-      <Text style={styles.subtitle}>Accès joueur pour les chasses, les étapes et le compte.</Text>
+      <Text style={styles.title}>{t('auth:login.mobileTitle')}</Text>
+      <Text style={styles.subtitle}>{t('auth:login.mobileSubtitle')}</Text>
 
-      <Pressable
-        style={[styles.demoButton, demoMode && styles.demoButtonActive]}
-        onPress={toggleDemo}
-        accessibilityRole="switch"
-        accessibilityState={{ checked: demoMode }}
-      >
-        <Text style={[styles.demoButtonText, demoMode && styles.demoButtonTextActive]}>
-          {demoMode ? '🧪 Mode démo activé — validation sans GPS' : 'Activer le mode démo (mock)'}
+      <TextInput
+        style={styles.input}
+        value={email}
+        onChangeText={setEmail}
+        placeholder={t('auth:login.fields.email')}
+        placeholderTextColor={colors.textFaint}
+        autoCapitalize="none"
+      />
+
+      {loginStage === 'credentials' ? (
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder={t('auth:login.fields.password')}
+          placeholderTextColor={colors.textFaint}
+          secureTextEntry
+        />
+      ) : (
+        <TextInput
+          style={styles.input}
+          value={code}
+          onChangeText={setCode}
+          placeholder={t('auth:login.fields.totp')}
+          placeholderTextColor={colors.textFaint}
+          keyboardType="number-pad"
+        />
+      )}
+
+      {error && <Text style={styles.error}>{error}</Text>}
+      {info && <Text style={styles.info}>{info}</Text>}
+
+      <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
+        <Text style={styles.buttonText}>
+          {loginStage === 'mfa' ? t('auth:login.actions.validateCode') : t('auth:login.actions.signIn')}
         </Text>
       </Pressable>
 
-      {demoMode ? (
-        <View>
-          <Text style={styles.demoHint}>Choisis un profil de démonstration :</Text>
-          {error && <Text style={styles.error}>{error}</Text>}
-          <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('player')} disabled={isLoading}>
-            <Text style={styles.buttonText}>🎮 Démo Joueur</Text>
-          </Pressable>
-          <Pressable style={[styles.roleButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('partner')} disabled={isLoading}>
-            <Text style={styles.roleButtonText}>🧰 Démo Partenaire (Studio)</Text>
-          </Pressable>
-          <Pressable style={[styles.roleButton, isLoading && styles.buttonDisabled]} onPress={() => handleDemo('admin')} disabled={isLoading}>
-            <Text style={styles.roleButtonText}>🛡️ Démo Admin (Studio)</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" />
-
-          {loginStage === 'credentials' ? (
-            <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" secureTextEntry />
-          ) : (
-            <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="Code TOTP" keyboardType="number-pad" />
-          )}
-
-          {error && <Text style={styles.error}>{error}</Text>}
-          {info && <Text style={styles.info}>{info}</Text>}
-
-          <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
-            <Text style={styles.buttonText}>{loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
-          </Pressable>
-        </>
+      {loginStage === 'credentials' && (
+        <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
+          {t('auth:login.links.forgotPassword')}
+        </Link>
       )}
+
+      <View style={styles.separatorRow}>
+        <View style={styles.separatorLine} />
+        <Text style={styles.separatorText}>{t('common:or')}</Text>
+        <View style={styles.separatorLine} />
+      </View>
+
+      <Pressable style={[styles.passkeyButton, isLoading && styles.buttonDisabled]} onPress={handlePasskeyLogin} disabled={isLoading}>
+        <Text style={styles.passkeyButtonText}>{t('auth:login.actions.signInWithPasskeyMobile')}</Text>
+      </Pressable>
+      <Text style={styles.passkeyHint}>{t('auth:login.passkeyHint')}</Text>
 
       {loginStage === 'mfa' && (
         <Pressable style={styles.linkButton} onPress={handleResetMfa}>
-          <Text style={styles.link}>Revenir aux identifiants</Text>
+          <Text style={styles.link}>{t('auth:login.actions.backToCredentials')}</Text>
         </Pressable>
       )}
 
-      {error?.includes('vérifié') && (
+      {needsVerification && (
         <Pressable style={styles.linkButton} onPress={handleResendVerification} disabled={isLoading}>
-          <Text style={styles.link}>Renvoyer le lien de vérification</Text>
+          <Text style={styles.link}>{t('auth:login.actions.resendVerification')}</Text>
         </Pressable>
       )}
 
       <Link href="/(auth)/register" style={styles.link}>
-        Créer un compte
+        {t('auth:login.links.createAccount')}
       </Link>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#fff9f5' },
-  title: { fontSize: 34, fontWeight: '800', color: '#1f2937', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#6b7280', marginBottom: 24 },
-  input: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#f2ddd2' },
-  button: { backgroundColor: '#ff6b35', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 8 },
+  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.background },
+  title: { fontSize: 34, fontWeight: '900', color: colors.foreground, marginBottom: 8 },
+  subtitle: { fontSize: 16, color: colors.textMuted, marginBottom: 24 },
+  input: { ...glassCard, borderRadius: radii.md, padding: 16, marginBottom: 12, color: colors.foreground },
+  button: { backgroundColor: colors.gold, paddingVertical: 16, borderRadius: radii.md, alignItems: 'center', marginTop: 8 },
   buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  demoHint: { color: '#6b7280', fontWeight: '600', marginBottom: 6 },
-  roleButton: { backgroundColor: '#1f2937', paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10 },
-  roleButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  demoButton: { borderWidth: 1, borderColor: '#ff6b35', borderStyle: 'dashed', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 16, alignItems: 'center' },
-  demoButtonActive: { backgroundColor: '#fff1e9', borderStyle: 'solid' },
-  demoButtonText: { color: '#ff6b35', fontWeight: '700', fontSize: 14 },
-  demoButtonTextActive: { color: '#c2410c' },
-  error: { color: '#b91c1c', marginBottom: 8 },
-  info: { color: '#075985', marginBottom: 8 },
+  buttonText: { color: colors.background, fontWeight: '900', fontSize: 16 },
+  forgotLink: { textAlign: 'right', marginTop: 10, color: colors.textMuted, fontSize: 13, fontWeight: '600' },
+  separatorRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 6 },
+  separatorLine: { flex: 1, height: 1, backgroundColor: colors.glassBorderStrong },
+  separatorText: { color: colors.textFaint, fontSize: 12, fontWeight: '700' },
+  passkeyButton: { borderColor: colors.teal, borderWidth: 1, backgroundColor: colors.tealSoft, paddingVertical: 14, borderRadius: radii.md, alignItems: 'center', marginTop: 8 },
+  passkeyButtonText: { color: colors.teal, fontWeight: '900', fontSize: 15 },
+  passkeyHint: { color: colors.textFaint, fontSize: 11, textAlign: 'center', marginTop: 8, lineHeight: 16 },
+  error: { color: colors.danger, marginBottom: 8 },
+  info: { color: colors.teal, marginBottom: 8 },
   linkButton: { marginTop: 10 },
-  link: { textAlign: 'center', marginTop: 18, color: '#ff6b35', fontWeight: '600' },
+  link: { textAlign: 'center', marginTop: 18, color: colors.teal, fontWeight: '600' },
 });

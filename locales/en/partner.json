@@ -1,0 +1,126 @@
+{
+  "studio": {
+    "heading": "Partner studio",
+    "subhead": "Create and manage your treasure hunts",
+    "newHunt": "New hunt",
+    "empty": "No hunts yet. Create your first adventure!",
+    "createHunt": "Create hunt",
+    "tooltips": {
+      "resumeHunt": "Resume hunt",
+      "pauseHunt": "Pause hunt"
+    }
+  },
+  "editor": {
+    "newHunt": "New hunt",
+    "editHunt": "Edit",
+    "huntSection": "Hunt",
+    "difficulty": "Difficulty",
+    "durationMinutes": "Duration (min)",
+    "status": "Status",
+    "stepsSection": "Steps ({count})",
+    "addStep": "+ Add",
+    "currentLocation": "📍 Current location",
+    "points": "Points",
+    "deleteHunt": "Delete hunt",
+    "deleteConfirmTitle": "Delete",
+    "deleteConfirmMessage": "This hunt will be permanently deleted.",
+    "photoReference": {
+      "hint": "Reference photo required",
+      "capture": "Capture",
+      "retake": "Retake",
+      "errors": {
+        "cameraDenied": "Camera permission denied.",
+        "captureFailed": "Capture failed",
+        "uploadFailed": "Upload failed"
+      }
+    }
+  },
+  "hunts": {
+    "header": "My hunts",
+    "empty": "No hunts",
+    "untitled": "Untitled",
+    "status": {
+      "active": "Active",
+      "draft": "Draft",
+      "paused": "Paused"
+    },
+    "cardMeta": "{stepCount} step{suffix} · {status}",
+    "editLoadError": "Hunt not found",
+    "accessDenied": "Access restricted to organizers",
+    "title": "My hunts",
+    "stepsMeta": "{count} steps · {status}"
+  },
+  "field": {
+    "header": "Field",
+    "segments": {
+      "creation": "Creation",
+      "liveops": "Live ops",
+      "heatmap": "Heatmap"
+    },
+    "creation": {
+      "myHunts": "My hunts",
+      "newHuntHere": "New hunt here",
+      "errors": {
+        "locationDenied": "Location permission denied.",
+        "gpsUnavailable": "GPS position unavailable."
+      }
+    },
+    "liveops": {
+      "empty": "No hunts",
+      "meta": "{stepCount} step{suffix} · {participants} participants",
+      "huntPause": {
+        "suspend": "Suspend",
+        "resume": "Resume",
+        "badge": "Paused"
+      },
+      "expandSteps": {
+        "show": "Steps ▼",
+        "hide": "Hide ▲"
+      },
+      "stepActions": {
+        "suspend": "Suspend",
+        "resume": "Resume",
+        "cancelRedirect": "Cancel",
+        "redirectHere": "Redirect here"
+      },
+      "redirectLabel": "→ {lat},{lng}",
+      "errors": {
+        "modifyFailed": "Could not apply change.",
+        "locationDenied": "Location permission denied.",
+        "gpsUnavailable": "GPS position unavailable."
+      }
+    },
+    "heatmap": {
+      "stats": {
+        "cells": "Cells",
+        "points": "Points"
+      },
+      "empty": "No data",
+      "clear": "Clear"
+    },
+    "photoClueCapture": {
+      "buttonNew": "📷 Secret photo",
+      "buttonRetake": "📷 Retake secret photo",
+      "errors": {
+        "cameraDenied": "Camera permission denied.",
+        "locationDenied": "Location permission denied.",
+        "tooFar": "Get within 15 m of the point (you are {distance} away).",
+        "gpsUnavailable": "GPS unavailable — try again outdoors.",
+        "captureFailed": "Capture failed, try again."
+      }
+    },
+    "audioHintRecorder": {
+      "recordNew": "🎙 10 s audio clue",
+      "rerecord": "🎙 Re-record audio clue",
+      "stop": "■ Stop",
+      "recIndicator": "● REC 0:{seconds}",
+      "listen": "▶ Listen",
+      "errors": {
+        "micDenied": "Microphone permission denied.",
+        "startFailed": "Could not start recording.",
+        "recordFailed": "Recording failed."
+      }
+    }
+  },
+  "notFound": "Hunt not found"
+}

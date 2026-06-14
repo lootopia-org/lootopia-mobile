@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import MapView, { Marker, PROVIDER_DEFAULT, LatLng, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 
@@ -9,6 +10,7 @@ type ChaseMapProps = {
 };
 
 export function ChaseMap({ center, markers }: ChaseMapProps) {
+  const { t } = useTranslation(['common']);
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [permissionRequested, setPermissionRequested] = useState(false);
 
@@ -53,20 +55,25 @@ export function ChaseMap({ center, markers }: ChaseMapProps) {
         showsUserLocation={permissionRequested}
         followsUserLocation={permissionRequested}
       >
-        <Marker coordinate={center} title="Zone de chasse" description="Point de départ ou zone de référence" pinColor="#ff6b35" />
+        <Marker
+          coordinate={center}
+          title={t('common:map.chaseMap.markerTitle')}
+          description={t('common:map.chaseMap.markerDescription')}
+          pinColor="#d4af37"
+        />
         {markers.map((marker, index) => (
           <Marker key={`${marker.title}-${index}`} coordinate={marker} title={marker.title} description={marker.description} />
         ))}
       </MapView>
       <View style={styles.floatingLabel}>
-        <Text style={styles.floatingTitle}>Carte de chasse</Text>
+        <Text style={styles.floatingTitle}>{t('common:map.chaseMap.floatingTitle')}</Text>
         <Text style={styles.floatingText}>
-          {userLocation ? 'Ta position réelle est affichée sur la carte.' : 'Activation de la géolocalisation en cours.'}
+          {userLocation ? t('common:map.chaseMap.locationActive') : t('common:map.chaseMap.locationLoading')}
         </Text>
       </View>
       {!permissionRequested && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator color="#ff6b35" />
+          <ActivityIndicator color="#d4af37" />
         </View>
       )}
     </View>
