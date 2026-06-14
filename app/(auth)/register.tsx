@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { ScrollView, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/src/state/AuthContext';
 import { colors, glassCard, radii } from '@/src/theme';
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { t } = useTranslation(['auth', 'common']);
   const { signUp } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -18,14 +20,13 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!username.trim()) {
-      setError('Choisis un pseudo.');
+      setError(t('auth:register.errors.usernameRequired'));
       return;
     }
     try {
       setIsLoading(true);
       setError(null);
       setInfo(null);
-      // Contrat API : {username, email, password, bio, avatar} — bio/avatar optionnels.
       await signUp({
         username: username.trim(),
         email: email.trim(),
@@ -33,10 +34,10 @@ export default function RegisterScreen() {
         bio: bio.trim() || undefined,
         avatar: avatar.trim() || undefined,
       });
-      setInfo('Compte créé. Vérifie ton email pour activer l’accès.');
+      setInfo(t('auth:register.success.mobile'));
       router.replace('/(auth)/login');
     } catch {
-      setError('Impossible de créer le compte.');
+      setError(t('auth:register.errors.createFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -44,30 +45,30 @@ export default function RegisterScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Créer un compte joueur</Text>
-      <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder="Pseudo *" placeholderTextColor={colors.textFaint} autoCapitalize="none" />
-      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email *" placeholderTextColor={colors.textFaint} autoCapitalize="none" keyboardType="email-address" />
-      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe *" placeholderTextColor={colors.textFaint} secureTextEntry />
+      <Text style={styles.title}>{t('auth:register.title')}</Text>
+      <TextInput style={styles.input} value={username} onChangeText={setUsername} placeholder={t('auth:register.usernamePlaceholder')} placeholderTextColor={colors.textFaint} autoCapitalize="none" />
+      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder={t('auth:register.emailPlaceholder')} placeholderTextColor={colors.textFaint} autoCapitalize="none" keyboardType="email-address" />
+      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder={t('auth:register.passwordPlaceholder')} placeholderTextColor={colors.textFaint} secureTextEntry />
       <TextInput
         style={[styles.input, styles.bioInput]}
         value={bio}
         onChangeText={setBio}
-        placeholder="Bio (optionnel)"
+        placeholder={t('auth:register.bioPlaceholder')}
         placeholderTextColor={colors.textFaint}
         multiline
         numberOfLines={3}
       />
-      <TextInput style={styles.input} value={avatar} onChangeText={setAvatar} placeholder="URL d’avatar (optionnel)" placeholderTextColor={colors.textFaint} autoCapitalize="none" />
+      <TextInput style={styles.input} value={avatar} onChangeText={setAvatar} placeholder={t('auth:register.avatarPlaceholder')} placeholderTextColor={colors.textFaint} autoCapitalize="none" />
 
       {error && <Text style={styles.error}>{error}</Text>}
       {info && <Text style={styles.info}>{info}</Text>}
 
       <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleRegister} disabled={isLoading}>
-        <Text style={styles.buttonText}>Créer mon compte</Text>
+        <Text style={styles.buttonText}>{t('auth:register.submit')}</Text>
       </Pressable>
 
       <Link href="/(auth)/login" style={styles.link}>
-        J’ai déjà un compte
+        {t('auth:register.hasAccount')}
       </Link>
     </ScrollView>
   );

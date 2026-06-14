@@ -1,0 +1,48 @@
+{
+  "console": {
+    "heading": "Admin console",
+    "subhead": "Platform overview and management",
+    "cards": {
+      "playerProfiles": "Player profiles",
+      "treasureHunts": "Treasure hunts",
+      "viewAllProfiles": "View all profiles →",
+      "manageHunts": "Manage hunts →"
+    },
+    "quickLinks": {
+      "profiles": "Profiles",
+      "hunts": "Hunts",
+      "createHunt": "Create hunt"
+    }
+  },
+  "profiles": {
+    "back": "Back to admin",
+    "heading": "Player profiles",
+    "tableTitle": "All profiles ({count})",
+    "columns": {
+      "username": "Username",
+      "email": "Email",
+      "points": "Points",
+      "level": "Level",
+      "completed": "Completed",
+      "actions": "Actions"
+    },
+    "empty": "No profiles yet.",
+    "toasts": {
+      "invalidNumbers": "Enter valid numbers for points, level, and completed hunts.",
+      "updated": "Profile updated",
+      "updateFailed": "Failed to update profile"
+    }
+  },
+  "hunts": {
+    "back": "Back to admin",
+    "heading": "Manage hunts",
+    "createHunt": "Create hunt",
+    "tableTitle": "All hunts ({count})",
+    "meta": "{stepCount} steps · {duration} · Partner {partnerIdPrefix}…",
+    "actions": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "empty": "No hunts yet."
+  }
+}

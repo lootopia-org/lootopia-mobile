@@ -1,41 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/src/state/AuthContext';
 import { useHunts, type AvatarModel } from '@/src/state/HuntsContext';
 import { PlayerCharacter3D } from '@/src/components/PlayerCharacter3D';
 import { SecuritySection } from '@/src/components/SecuritySection';
-import { fetchOrCreateProfile, profileApi, type Profile } from '@/src/lib/profile-api';
+import { usePlayerProfile } from '@/src/hooks/usePlayerProfile';
+import { profileApi } from '@/src/lib/profile-api';
+import { setAppLocale, type AppLocale } from '@/src/i18n';
 import { colors, glassCard, glassStrongCard, radii } from '@/src/theme';
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Administrateur',
-  partner: 'Partenaire',
-  player: 'Joueur',
-};
 
 const XP_TARGET = 2000;
 
 export default function AccountScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t, i18n } = useTranslation(['common']);
   const { user, signOut, token } = useAuth();
   const { avatarModel, setAvatarModel, acceptedHunts } = useHunts();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profile, points, level, completedHunts, refreshProfile } = usePlayerProfile();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // Profil serveur (GET /profile, créé via POST au premier passage).
   const realToken = token;
-  useEffect(() => {
-    if (!realToken) {
-      setProfile(null);
-      return;
-    }
-    fetchOrCreateProfile(realToken)
-      .then(setProfile)
-      .catch(() => setProfile(null));
-  }, [realToken]);
 
   const handleLogout = async () => {
     await signOut();
@@ -52,42 +40,54 @@ export default function AccountScreen() {
     }
     try {
       await profileApi.delete(realToken);
-      setProfile(null);
+      await refreshProfile();
     } finally {
       setConfirmDelete(false);
     }
   };
 
-  const points = profile?.points ?? 0;
-  const level = profile?.level ?? 1;
-  const completedHunts = profile?.completedHunts ?? 0;
+  const handleLanguageChange = async (locale: AppLocale) => {
+    await setAppLocale(locale);
+  };
+
   const xpRatio = Math.min(points / XP_TARGET, 1);
+  const currentLocale = i18n.language.startsWith('fr') ? 'fr' : 'en';
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32, paddingHorizontal: 16 }}
     >
-      <Text style={styles.header}>Profil</Text>
+      <Text style={styles.header}>{t('common:account.profile')}</Text>
 
-      {/* Aperçu du personnage + choix du modèle (MVP : aperçu sprite, remplacé
-          plus tard par le rendu GLB — voir conception-prototype-AR-lootopia.md). */}
       <View style={[styles.avatarCard]}>
         <PlayerCharacter3D model={avatarModel} walking={false} headingDegrees={25} size={150} showBadge={false} />
         <View style={styles.toggleRow}>
-          <ModelToggle current={avatarModel} value="male" label="Homme" onSelect={setAvatarModel} />
-          <ModelToggle current={avatarModel} value="female" label="Femme" onSelect={setAvatarModel} />
+          <ModelToggle
+            current={avatarModel}
+            value="male"
+            label={t('common:avatar.male')}
+            onSelect={setAvatarModel}
+          />
+          <ModelToggle
+            current={avatarModel}
+            value="female"
+            label={t('common:avatar.female')}
+            onSelect={setAvatarModel}
+          />
         </View>
-        <Text style={styles.username}>{user?.username ?? 'Invité'}</Text>
-        <Text style={styles.role}>{user?.role ? ROLE_LABELS[user.role] : 'Joueur'} · {user?.email ?? '-'}</Text>
+        <Text style={styles.username}>{user?.username ?? t('common:guest')}</Text>
+        <Text style={styles.role}>
+          {user?.role ? t(`common:roles.${user.role}`) : t('common:roles.player')} · {user?.email ?? '-'}
+        </Text>
       </View>
 
-      {/* Niveau + XP */}
       <View style={styles.levelCard}>
         <View style={styles.levelRow}>
-          <Text style={styles.levelText}>⭐ Niveau {level}</Text>
+          <Text style={styles.levelText}>{t('common:account.level', { level })}</Text>
           <Text style={styles.xpText}>
-            {points} / {XP_TARGET} XP{profile ? '' : ' · hors-ligne'}
+            {t('common:account.xpProgress', { points, target: XP_TARGET })}
+            {profile ? '' : ` · ${t('common:offline')}`}
           </Text>
         </View>
         <View style={styles.xpTrack}>
@@ -95,25 +95,38 @@ export default function AccountScreen() {
         </View>
       </View>
 
-      {/* Statistiques */}
       <View style={styles.statsGrid}>
-        <Stat value={String(points)} label="Points" gold />
-        <Stat value={String(completedHunts)} label="Chasses finies" />
-        <Stat value={String(Object.keys(acceptedHunts).length)} label="En cours" teal />
+        <Stat value={String(points)} label={t('common:account.stats.points')} gold />
+        <Stat value={String(completedHunts)} label={t('common:account.stats.completedHunts')} />
+        <Stat value={String(Object.keys(acceptedHunts).length)} label={t('common:account.stats.inProgress')} teal />
+      </View>
+
+      <View style={styles.languageCard}>
+        <Text style={styles.languageTitle}>{t('common:localeSwitcher.label')}</Text>
+        <View style={styles.languageRow}>
+          <LanguageToggle
+            label={t('common:localeSwitcher.en')}
+            active={currentLocale === 'en'}
+            onPress={() => void handleLanguageChange('en')}
+          />
+          <LanguageToggle
+            label={t('common:localeSwitcher.fr')}
+            active={currentLocale === 'fr'}
+            onPress={() => void handleLanguageChange('fr')}
+          />
+        </View>
       </View>
 
       <SecuritySection />
 
       <Pressable style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Déconnexion</Text>
+        <Text style={styles.logoutText}>{t('common:account.logout')}</Text>
       </Pressable>
 
       {realToken && (
         <Pressable onPress={handleDeleteProfile}>
           <Text style={styles.deleteProfile}>
-            {confirmDelete
-              ? '⚠️ Appuie à nouveau pour confirmer la suppression du profil (points et progression perdus)'
-              : 'Supprimer mon profil'}
+            {confirmDelete ? t('common:account.deleteProfileConfirm') : t('common:account.deleteProfile')}
           </Text>
         </Pressable>
       )}
@@ -140,6 +153,22 @@ function ModelToggle({
   );
 }
 
+function LanguageToggle({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={[styles.toggle, active && styles.toggleActive]} onPress={onPress}>
+      <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function Stat({ value, label, gold, teal }: { value: string; label: string; gold?: boolean; teal?: boolean }) {
   return (
     <View style={styles.statCard}>
@@ -153,7 +182,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { fontSize: 28, fontWeight: '900', color: colors.foreground, marginBottom: 16 },
   avatarCard: { ...glassStrongCard, alignItems: 'center', padding: 20 },
-  avatarSprite: { fontSize: 72 },
   toggleRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   toggle: { borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 18, paddingVertical: 7, backgroundColor: colors.glass },
   toggleActive: { backgroundColor: colors.goldSoft, borderColor: colors.gold },
@@ -171,6 +199,9 @@ const styles = StyleSheet.create({
   statCard: { ...glassCard, flexBasis: '47%', flexGrow: 1, paddingVertical: 16, alignItems: 'center' },
   statValue: { fontSize: 24, fontWeight: '900', color: colors.foreground },
   statLabel: { color: colors.textMuted, marginTop: 4, fontSize: 11, fontWeight: '700' },
+  languageCard: { ...glassCard, padding: 16, marginTop: 12 },
+  languageTitle: { color: colors.foreground, fontWeight: '800', fontSize: 14, marginBottom: 10 },
+  languageRow: { flexDirection: 'row', gap: 8 },
   logoutButton: { marginTop: 20, borderColor: colors.danger, borderWidth: 1, paddingVertical: 15, borderRadius: radii.md, alignItems: 'center', backgroundColor: 'rgba(248,113,113,0.08)' },
   logoutText: { color: colors.danger, fontWeight: '800' },
   deleteProfile: { color: colors.textFaint, fontSize: 11, textAlign: 'center', marginTop: 14, textDecorationLine: 'underline' },

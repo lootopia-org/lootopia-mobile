@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, glassCard, radii } from '@/src/theme';
 
 type Props = {
@@ -8,7 +9,9 @@ type Props = {
   placeholder?: string;
 };
 
-export function StepAnswerInput({ description, onSubmit, placeholder = 'Réponse' }: Props) {
+export function StepAnswerInput({ description, onSubmit, placeholder }: Props) {
+  const { t } = useTranslation(['hunts', 'common']);
+  const resolvedPlaceholder = placeholder ?? t('hunts:stepAnswer.defaultPlaceholder');
   const [answer, setAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +28,7 @@ export function StepAnswerInput({ description, onSubmit, placeholder = 'Réponse
       await onSubmit(trimmed);
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Réponse incorrecte');
+      setError(err instanceof Error ? err.message : t('hunts:stepAnswer.errorIncorrect'));
     } finally {
       setSubmitting(false);
     }
@@ -36,7 +39,7 @@ export function StepAnswerInput({ description, onSubmit, placeholder = 'Réponse
       <Text style={styles.description}>{description}</Text>
       <TextInput
         style={styles.input}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         placeholderTextColor={colors.textFaint}
         value={answer}
         onChangeText={setAnswer}
@@ -52,7 +55,7 @@ export function StepAnswerInput({ description, onSubmit, placeholder = 'Réponse
         {submitting ? (
           <ActivityIndicator color={colors.background} size="small" />
         ) : (
-          <Text style={styles.buttonText}>{done ? 'Validé ✓' : 'Valider'}</Text>
+          <Text style={styles.buttonText}>{done ? t('hunts:stepAnswer.validated') : t('common:submit')}</Text>
         )}
       </Pressable>
       {error ? <Text style={styles.error}>{error}</Text> : null}

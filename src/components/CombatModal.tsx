@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, radii } from '@/src/theme';
 
 type CombatModalProps = {
@@ -10,26 +11,24 @@ type CombatModalProps = {
 
 const TRACK_WIDTH = 260;
 const CURSOR_WIDTH = 14;
-// Zone or centrée : réussite si le curseur s'y trouve au moment de la frappe.
 const ZONE_RATIO = 0.26;
 const GUARDIAN_HP = 2;
 const PLAYER_HP = 2;
 
-/**
- * Combat du gardien — duel de timing. Un gardien protège le coffre : le
- * curseur oscille sur la jauge, frappe quand il traverse la zone dorée.
- * Touché = le gardien perd 1 PV ; raté = tu perds 1 PV. La vitesse augmente
- * à chaque manche. Victoire → l'étape peut être validée.
- */
 export function CombatModal({ visible, onWin, onFlee }: CombatModalProps) {
+  const { t } = useTranslation('hunts');
   const cursor = useRef(new Animated.Value(0)).current;
   const cursorValue = useRef(0);
   const animation = useRef<Animated.CompositeAnimation | null>(null);
   const [guardianHp, setGuardianHp] = useState(GUARDIAN_HP);
   const [playerHp, setPlayerHp] = useState(PLAYER_HP);
   const [round, setRound] = useState(1);
-  const [message, setMessage] = useState('Un gardien protège le coffre !');
+  const [message, setMessage] = useState('');
   const [outcome, setOutcome] = useState<'fighting' | 'won' | 'lost'>('fighting');
+
+  useEffect(() => {
+    setMessage(t('combat.messages.intro'));
+  }, [t]);
 
   useEffect(() => {
     const listener = cursor.addListener(({ value }) => {
@@ -40,7 +39,6 @@ export function CombatModal({ visible, onWin, onFlee }: CombatModalProps) {
 
   const startOscillation = (speedRound: number) => {
     animation.current?.stop();
-    // Plus la manche est avancée, plus le curseur est rapide.
     const duration = Math.max(900 - speedRound * 150, 420);
     animation.current = Animated.loop(
       Animated.sequence([
@@ -57,14 +55,14 @@ export function CombatModal({ visible, onWin, onFlee }: CombatModalProps) {
       setPlayerHp(PLAYER_HP);
       setRound(1);
       setOutcome('fighting');
-      setMessage('Un gardien protège le coffre !');
+      setMessage(t('combat.messages.intro'));
       cursor.setValue(0);
       startOscillation(1);
     } else {
       animation.current?.stop();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [visible, t]);
 
   const handleStrike = () => {
     if (outcome !== 'fighting') {
@@ -77,21 +75,21 @@ export function CombatModal({ visible, onWin, onFlee }: CombatModalProps) {
       setGuardianHp(nextHp);
       if (nextHp <= 0) {
         setOutcome('won');
-        setMessage('Gardien vaincu ! Le coffre est à toi.');
+        setMessage(t('combat.messages.playerWins'));
         animation.current?.stop();
         return;
       }
-      setMessage('Touché ! Le gardien chancelle…');
+      setMessage(t('combat.messages.hit'));
     } else {
       const nextHp = playerHp - 1;
       setPlayerHp(nextHp);
       if (nextHp <= 0) {
         setOutcome('lost');
-        setMessage('Le gardien t’a repoussé…');
+        setMessage(t('combat.messages.guardianWins'));
         animation.current?.stop();
         return;
       }
-      setMessage('Raté ! Le gardien contre-attaque.');
+      setMessage(t('combat.messages.miss'));
     }
 
     const nextRound = round + 1;
@@ -104,7 +102,7 @@ export function CombatModal({ visible, onWin, onFlee }: CombatModalProps) {
     setPlayerHp(PLAYER_HP);
     setRound(1);
     setOutcome('fighting');
-    setMessage('Le gardien se redresse — à toi de jouer !');
+    setMessage(t('combat.messages.retryIntro'));
     startOscillation(1);
   };
 
@@ -118,15 +116,15 @@ export function CombatModal({ visible, onWin, onFlee }: CombatModalProps) {
     <View style={styles.backdrop}>
       <View style={styles.card}>
         <Text style={styles.guardian}>{outcome === 'won' ? '💀' : '👹'}</Text>
-        <Text style={styles.title}>Combat du gardien</Text>
+        <Text style={styles.title}>{t('combat.title')}</Text>
         <Text style={styles.message}>{message}</Text>
 
         <View style={styles.hpRow}>
           <Text style={styles.hpLabel}>
-            Gardien {'❤️'.repeat(Math.max(guardianHp, 0))}{'🖤'.repeat(GUARDIAN_HP - Math.max(guardianHp, 0))}
+            {t('combat.hp.guardian')} {'❤️'.repeat(Math.max(guardianHp, 0))}{'🖤'.repeat(GUARDIAN_HP - Math.max(guardianHp, 0))}
           </Text>
           <Text style={styles.hpLabel}>
-            Toi {'❤️'.repeat(Math.max(playerHp, 0))}{'🖤'.repeat(PLAYER_HP - Math.max(playerHp, 0))}
+            {t('combat.hp.you')} {'❤️'.repeat(Math.max(playerHp, 0))}{'🖤'.repeat(PLAYER_HP - Math.max(playerHp, 0))}
           </Text>
         </View>
 
@@ -151,27 +149,27 @@ export function CombatModal({ visible, onWin, onFlee }: CombatModalProps) {
               />
             </View>
             <Pressable style={styles.strikeButton} onPress={handleStrike}>
-              <Text style={styles.strikeText}>⚔️ Frapper !</Text>
+              <Text style={styles.strikeText}>{t('combat.buttons.strike')}</Text>
             </Pressable>
             <Pressable onPress={onFlee}>
-              <Text style={styles.flee}>Fuir le combat</Text>
+              <Text style={styles.flee}>{t('combat.buttons.flee')}</Text>
             </Pressable>
           </>
         )}
 
         {outcome === 'won' && (
           <Pressable style={styles.strikeButton} onPress={onWin}>
-            <Text style={styles.strikeText}>Ouvrir le coffre 🪙</Text>
+            <Text style={styles.strikeText}>{t('combat.buttons.openChest')}</Text>
           </Pressable>
         )}
 
         {outcome === 'lost' && (
           <>
             <Pressable style={styles.strikeButton} onPress={handleRetry}>
-              <Text style={styles.strikeText}>Réessayer</Text>
+              <Text style={styles.strikeText}>{t('combat.buttons.retry')}</Text>
             </Pressable>
             <Pressable onPress={onFlee}>
-              <Text style={styles.flee}>Abandonner</Text>
+              <Text style={styles.flee}>{t('combat.buttons.giveUp')}</Text>
             </Pressable>
           </>
         )}

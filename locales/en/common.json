@@ -1,0 +1,369 @@
+{
+  "metadata": {
+    "title": "Lootopia — Treasure Hunts Reimagined",
+    "description": "Discover treasure hunts, track your progress, and play immersive adventures in the Lootopia mobile app."
+  },
+  "localeSwitcher": {
+    "label": "Language",
+    "en": "English",
+    "fr": "Français"
+  },
+  "languageEnglish": "English",
+  "languageFrench": "Français",
+  "guest": "Guest",
+  "offline": "offline",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "back": "← Back",
+  "create": "Create",
+  "save": "Save",
+  "close": "Close",
+  "confirm": "Confirm",
+  "continue": "Continue",
+  "send": "Send",
+  "submit": "Submit",
+  "or": "or",
+  "roles": {
+    "admin": "Administrator",
+    "partner": "Partner",
+    "player": "Player"
+  },
+  "avatar": {
+    "male": "Male",
+    "female": "Female"
+  },
+  "difficulty": {
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Hard"
+  },
+  "status": {
+    "draft": "Draft",
+    "active": "Active",
+    "archived": "Archived",
+    "paused": "Paused"
+  },
+  "placeholders": {
+    "title": "Title",
+    "description": "Description",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "answer": "Answer",
+    "qrContent": "QR content",
+    "hintCode": "Clue / code",
+    "email": "Email",
+    "password": "Password",
+    "totpCode": "TOTP code",
+    "sixDigitCode": "6-digit code"
+  },
+  "permissions": {
+    "locationDenied": "Location permission denied.",
+    "gpsUnavailable": "GPS position unavailable.",
+    "cameraDenied": "Camera permission denied.",
+    "micDenied": "Microphone permission denied.",
+    "microphoneDenied": "Microphone permission denied.",
+    "gpsUnavailableOutdoor": "GPS unavailable — try again outdoors."
+  },
+  "errors": {
+    "saveFailed": "Save failed",
+    "deleteFailed": "Delete failed",
+    "operationFailed": "Operation failed.",
+    "captureFailed": "Capture failed",
+    "uploadFailed": "Upload failed",
+    "modifyFailed": "Could not apply change.",
+    "loadFailed": "Could not load"
+  },
+  "nav": {
+    "brand": "Lootopia",
+    "links": {
+      "hunts": "Hunts",
+      "dashboard": "Dashboard",
+      "settings": "Settings"
+    },
+    "auth": {
+      "signIn": "Sign in",
+      "getStarted": "Get started"
+    },
+    "aria": {
+      "toggleMenu": "Toggle menu"
+    }
+  },
+  "footer": {
+    "tagline": "Real-world treasure hunts with AR, riddles, and adventure. Play in the app — track progress on the web.",
+    "explore": {
+      "heading": "Explore",
+      "huntCatalog": "Hunt catalog",
+      "createAccount": "Create account",
+      "dashboard": "Dashboard",
+      "settings": "Settings"
+    },
+    "portals": {
+      "heading": "Portals",
+      "partnerStudio": "Partner studio",
+      "adminConsole": "Admin console"
+    },
+    "copyright": "© {year} Lootopia. All rights reserved."
+  },
+  "home": {
+    "eyebrow": "Treasure hunts reimagined",
+    "headline": "Find loot. Level up. Explore the world.",
+    "subhead": "Browse hunts on the web, track your stats, and download the app to play with AR, GPS, and live riddles.",
+    "downloadApp": "Download app",
+    "browseHunts": "Browse hunts",
+    "features": {
+      "heading": "How Lootopia works",
+      "realWorld": {
+        "title": "Real-world adventures",
+        "description": "GPS checkpoints and location-based puzzles take you through cities and landmarks."
+      },
+      "ar": {
+        "title": "AR treasure hunts",
+        "description": "Discover hidden loot through augmented reality — exclusively in the mobile app."
+      },
+      "legacy": {
+        "title": "Track your legacy",
+        "description": "View points, level, and completed hunts on your web dashboard."
+      }
+    },
+    "featured": {
+      "heading": "Featured hunts",
+      "subhead": "Preview adventures — play them in the app",
+      "viewAll": "View all",
+      "signInPrompt": "Sign in to preview featured hunts from the catalog.",
+      "signIn": "Sign in",
+      "empty": "No hunts available yet. Check back soon!"
+    }
+  },
+  "dashboard": {
+    "heading": "Welcome, {username}",
+    "subhead": "Your treasure hunting stats",
+    "settingsLink": "Settings",
+    "stats": {
+      "level": "Level",
+      "totalPoints": "Total points",
+      "huntsCompleted": "Hunts completed",
+      "activeHunts": "Active hunts"
+    },
+    "profileEmpty": "Your player profile will appear here once you complete your first hunt in the app.",
+    "joinedHunts": {
+      "heading": "Currently joined",
+      "badge": "{count} in progress",
+      "inProgress": "In progress",
+      "stepMeta": "{stepCount} steps · {duration}",
+      "empty": "You haven't joined any hunts yet. Browse the catalog and start one in the app.",
+      "browseCatalog": "Browse the catalog"
+    }
+  },
+  "settings": {
+    "heading": "Account settings",
+    "signedInAs": "Signed in as {username}",
+    "roleLinks": {
+      "adminConsole": "Admin console",
+      "partnerStudio": "Partner studio",
+      "viewStats": "View stats"
+    },
+    "signOut": "Sign out",
+    "logoutFailed": "Logout failed",
+    "activeHunts": {
+      "heading": "Active hunts",
+      "inProgress": "In progress",
+      "stepMeta": "{stepCount} steps · {duration}",
+      "empty": "No active hunts. Browse the catalog and start one in the app.",
+      "browseCatalog": "Browse the catalog"
+    }
+  },
+  "notFound": {
+    "code": "404",
+    "heading": "Lost in the wilderness",
+    "message": "This page doesn't exist or has been moved.",
+    "returnHome": "Return home"
+  },
+  "appDownload": {
+    "title": "Play in the Lootopia app",
+    "description": "Treasure hunts are played on mobile with AR, GPS checkpoints, and live riddles. Download the app to start your adventure.",
+    "downloadApp": "Download app",
+    "downloadForAndroid": "Download for Android",
+    "directDownloadNote": "Direct download from our server",
+    "qr": {
+      "scanPrompt": "Scan to download on your phone",
+      "alt": "Download QR code"
+    }
+  },
+  "tabs": {
+    "map": "Map",
+    "available": "Available",
+    "inProgress": "In progress",
+    "field": "Field",
+    "profile": "Profile"
+  },
+  "buttons": {
+    "accept": "Accept",
+    "launch": "Launch",
+    "play": "Play",
+    "resume": "Resume",
+    "pause": "⏸ Pause",
+    "resumeIcon": "▶ Resume",
+    "signIn": "Sign in",
+    "signOut": "Sign out"
+  },
+  "account": {
+    "profile": "Profile",
+    "level": "⭐ Level {level}",
+    "levelShort": "⭐ Lv. {level}",
+    "xpProgress": "{points} / {target} XP",
+    "logout": "Sign out",
+    "deleteProfile": "Delete my profile",
+    "deleteProfileConfirm": "⚠️ Tap again to confirm profile deletion (points and progress will be lost)",
+    "stats": {
+      "points": "Points",
+      "completedHunts": "Completed hunts",
+      "inProgress": "In progress",
+      "pointsHud": "{points} pts"
+    }
+  },
+  "security": {
+    "title": "🔐 Security",
+    "loginRequired": "Sign in to manage your account security.",
+    "totp": {
+      "sectionLabel": "Two-factor authentication (TOTP)",
+      "status": {
+        "enabled": "● Enabled",
+        "disabled": "○ Disabled",
+        "unknown": "? Unknown"
+      },
+      "enrollInstructions": "Add this secret to your authenticator app (Google Authenticator, Authy…) then enter the generated code:",
+      "disableInstructions": "Enter a valid TOTP code to confirm deactivation:",
+      "placeholder": "6-digit code",
+      "activate": "Enable TOTP",
+      "disable": "Disable",
+      "disableEllipsis": "Disable…",
+      "successEnabled": "TOTP enabled on your account ✓",
+      "successDisabled": "TOTP disabled."
+    },
+    "passkeys": {
+      "sectionLabel": "Registered passkeys",
+      "listUnavailable": "List unavailable.",
+      "empty": "No passkey. Add one from the website (Settings → Security).",
+      "defaultName": "Passkey",
+      "metaCreated": "created on {date}",
+      "metaLastUsed": " · last used on {date}"
+    },
+    "web": {
+      "title": "Security",
+      "description": "Manage two-factor authentication and passkeys for your account.",
+      "tabs": {
+        "authenticator": "Authenticator",
+        "passkeys": "Passkeys"
+      },
+      "totp": {
+        "enable": "Enable authenticator app",
+        "qrAlt": "TOTP QR code",
+        "verificationCode": "Verification code",
+        "placeholder": "000000",
+        "confirmEnable": "Confirm & enable",
+        "disableLabel": "Disable TOTP (requires current code)",
+        "disable": "Disable authenticator"
+      },
+      "passkeys": {
+        "register": "Register new passkey",
+        "defaultName": "Passkey",
+        "added": "Added {date}"
+      },
+      "toasts": {
+        "scanQr": "Scan the QR code with your authenticator app",
+        "totpEnrollFailed": "Failed to start TOTP enrollment",
+        "twoFactorEnabled": "Two-factor authentication enabled",
+        "twoFactorDisabled": "Two-factor authentication disabled",
+        "invalidCode": "Invalid code",
+        "passkeyRegistered": "Passkey registered",
+        "passkeyRegistrationFailed": "Passkey registration failed"
+      }
+    }
+  },
+  "map": {
+    "styles": {
+      "dark": "Dark",
+      "light": "Light",
+      "satellite": "Satellite"
+    },
+    "locationDenied": "Location denied — enable it in settings to see your position.",
+    "proximity": {
+      "title": "🧰 Nearby hunt!",
+      "body": "\"{huntTitle}\" is within 250 m."
+    },
+    "sheet": {
+      "rewardChip": "🏆 {points} pts",
+      "distanceChip": "📍 {distance}",
+      "acceptCta": "Accept hunt",
+      "acceptedCta": "In progress ✓ — view details"
+    },
+    "chaseMap": {
+      "markerTitle": "Hunt zone",
+      "markerDescription": "Starting point or reference area",
+      "floatingTitle": "Hunt map",
+      "locationActive": "Your real position is shown on the map.",
+      "locationLoading": "Enabling geolocation…"
+    },
+    "playerBadge": {
+      "you": "You",
+      "walking": "Walking"
+    },
+    "distance": {
+      "meters": "{m} m",
+      "kilometers": "{km} km"
+    },
+    "levelShort": "⭐ Lv. {level}",
+    "pointsShort": "{points} pts",
+    "locationDeniedBanner": "Location denied — enable it in settings to see your position.",
+    "proximityTitle": "🧰 Nearby hunt!",
+    "proximityText": "\"{title}\" is within 250 m.",
+    "inProgressDetail": "In progress ✓ — view details",
+    "acceptHunt": "Accept hunt"
+  },
+  "organizerOnly": {
+    "fieldTab": "Organizers only",
+    "partnerHunts": "Access restricted to organizers"
+  },
+  "stepsDuration": "{stepCount} steps · {duration}",
+  "stepsPoints": "{stepCount} steps · {totalPoints} points",
+  "steps": "{count} steps",
+  "points": "{points} pts",
+  "partner": "Partner: {id}…",
+  "completed": "Completed",
+  "inProgress": "In progress",
+  "image": {
+    "label": "Image",
+    "uploaded": "Image uploaded",
+    "uploadFailed": "Upload failed",
+    "chooseFile": "Choose file",
+    "takePhoto": "Take photo",
+    "remove": "Remove image",
+    "selectedReference": "Selected image",
+    "uploading": "Uploading…",
+    "takeOrUpload": "Take a photo or upload from device",
+    "uploadFromDevice": "Upload from device",
+    "processing": "Processing…",
+    "uploadImage": "Upload image",
+    "previewUnavailable": "Preview unavailable",
+    "loadingPreview": "Loading preview…"
+  },
+  "appName": "Lootopia Mobile",
+  "language": "Language",
+  "retry": "Retry",
+  "actions": {
+    "retake": "Retake",
+    "capture": "Capture",
+    "validated": "Validated ✓",
+    "validate": "Submit",
+    "continue": "Continue",
+    "launch": "Launch",
+    "accept": "Accept",
+    "play": "Play",
+    "resume": "Resume",
+    "suspend": "Suspend"
+  },
+  "date": {
+    "createdOn": "created on {date}",
+    "lastUsedOn": " · last used on {date}"
+  }
+}

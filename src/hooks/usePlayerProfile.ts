@@ -1,48 +1,26 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { fetchOrCreateProfile, type Profile } from '@/src/lib/profile-api';
-import { useAuth } from '@/src/state/AuthContext';
+import { usePlayerProfileContext } from '@/src/state/PlayerProfileContext';
 
 /**
- * Profil joueur (GET /profile). Rechargé à chaque focus de l'écran appelant,
- * pour que les points crédités par PATCH /profile (fin de chasse) apparaissent
- * sans redémarrage.
+ * Player profile (points, level, completed hunts) backed by shared context.
+ * Refreshes from GET /profile when the calling screen gains focus.
  */
 export function usePlayerProfile() {
-  const { token } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
-
-  const realToken = token;
+  const { profile, isLive, points, level, completedHunts, refreshProfile } = usePlayerProfileContext();
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      if (!realToken) {
-        setProfile(null);
-        return;
-      }
-      fetchOrCreateProfile(realToken)
-        .then((result) => {
-          if (!cancelled) {
-            setProfile(result);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setProfile(null);
-          }
-        });
-      return () => {
-        cancelled = true;
-      };
-    }, [realToken])
+      void refreshProfile();
+    }, [refreshProfile])
   );
 
   return {
     profile,
-    isLive: profile !== null,
-    points: profile?.points ?? 0,
-    level: profile?.level ?? 1,
-    completedHunts: profile?.completedHunts ?? 0,
+    isLive,
+    points,
+    level,
+    completedHunts,
+    refreshProfile,
   };
 }

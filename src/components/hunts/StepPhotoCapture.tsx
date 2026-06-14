@@ -9,19 +9,21 @@ import {
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { uploadStepImage } from '@/src/lib/upload-api';
+import { useTranslation } from 'react-i18next';
 import { colors, glassCard, radii } from '@/src/theme';
 
 type Props = {
   description: string;
-  onSubmit: (photoUrl: string) => Promise<void>;
+  onSubmit: (photoData: string) => Promise<void>;
 };
 
 export function StepPhotoCapture({ description, onSubmit }: Props) {
+  const { t } = useTranslation(['hunts', 'common']);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -34,7 +36,7 @@ export function StepPhotoCapture({ description, onSubmit }: Props) {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
-        setError('Permission caméra refusée.');
+        setError(t('hunts:stepPhoto.errors.cameraDenied'));
         return;
       }
     }
@@ -43,29 +45,29 @@ export function StepPhotoCapture({ description, onSubmit }: Props) {
 
   const takePhoto = async () => {
     try {
-      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.85 });
+      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.85, base64: true });
       if (photo?.uri) {
         setPreviewUri(photo.uri);
+        setPhotoBase64(photo.base64 ?? null);
         setCameraOpen(false);
       }
     } catch {
-      setError('Capture échouée');
+      setError(t('hunts:stepPhoto.errors.captureFailed'));
       setCameraOpen(false);
     }
   };
 
   const submit = async () => {
-    if (!previewUri || submitting || done) {
+    if (!photoBase64 || submitting || done) {
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      const url = await uploadStepImage(previewUri);
-      await onSubmit(url);
+      await onSubmit(`data:image/jpeg;base64,${photoBase64}`);
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Photo non reconnue');
+      setError(err instanceof Error ? err.message : t('hunts:stepPhoto.errors.notRecognized'));
     } finally {
       setSubmitting(false);
     }
@@ -77,7 +79,7 @@ export function StepPhotoCapture({ description, onSubmit }: Props) {
       {previewUri ? <Image source={{ uri: previewUri }} style={styles.preview} /> : null}
       {!done && (
         <Pressable style={styles.button} onPress={() => void openCamera()} disabled={submitting}>
-          <Text style={styles.buttonText}>{previewUri ? 'Reprendre' : 'Prendre une photo'}</Text>
+          <Text style={styles.buttonText}>{previewUri ? t('hunts:stepPhoto.retake') : t('hunts:stepPhoto.takePhoto')}</Text>
         </Pressable>
       )}
       {previewUri && !done ? (
@@ -85,11 +87,11 @@ export function StepPhotoCapture({ description, onSubmit }: Props) {
           {submitting ? (
             <ActivityIndicator color={colors.background} size="small" />
           ) : (
-            <Text style={styles.buttonText}>Envoyer</Text>
+            <Text style={styles.buttonText}>{t('hunts:stepPhoto.send')}</Text>
           )}
         </Pressable>
       ) : null}
-      {done ? <Text style={styles.success}>Étape validée ✓</Text> : null}
+      {done ? <Text style={styles.success}>{t('hunts:stepPhoto.validated')}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Modal visible={cameraOpen} animationType="slide">
@@ -97,10 +99,10 @@ export function StepPhotoCapture({ description, onSubmit }: Props) {
           <CameraView ref={cameraRef} style={styles.camera} />
           <View style={styles.modalActions}>
             <Pressable style={styles.modalButton} onPress={() => setCameraOpen(false)}>
-              <Text style={styles.modalButtonText}>Annuler</Text>
+              <Text style={styles.modalButtonText}>{t('common:cancel')}</Text>
             </Pressable>
             <Pressable style={[styles.modalButton, styles.modalButtonPrimary]} onPress={() => void takePhoto()}>
-              <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>Capturer</Text>
+              <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>{t('hunts:stepPhoto.capture')}</Text>
             </Pressable>
           </View>
         </View>

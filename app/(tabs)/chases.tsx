@@ -1,41 +1,53 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, ImageBackground, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StoredImageBackground } from '@/src/components/StoredImage';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import { huntJoinErrorMessage } from '@/src/lib/hunt-join-errors';
 import { useHunts } from '@/src/state/HuntsContext';
 import { colors, glassCard, radii } from '@/src/theme';
 import { formatDistance, haversineDistanceMeters, type GeoPoint } from '@/src/lib/geo';
 
-const DIFFICULTY_LABELS: Record<string, string> = {
-  easy: 'Facile',
-  medium: 'Moyenne',
-  hard: 'Difficile',
-};
-
 export default function ChasesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isAccepted, acceptHunt } = useHunts();
+  const { t } = useTranslation(['hunts', 'common']);
+  const { isAccepted, acceptHunt, abandonHunt, canPlayHunts, refreshFromServer } = useHunts();
   const [chases, setChases] = useState<Chase[]>([]);
   const [position, setPosition] = useState<GeoPoint | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [leavingId, setLeavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        setChases(await chaseApi.getChases());
-      } catch {
-        setError('Chargement impossible');
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+    if (canPlayHunts) {
+      void refreshFromServer();
+    }
+  }, [canPlayHunts, refreshFromServer]);
 
+  const loadChases = useCallback(async () => {
+    try {
+      setError(null);
+      setChases(await chaseApi.getChases());
+    } catch {
+      setError(t('hunts:catalog.errors.loadFailed'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [t]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(true);
+      void loadChases();
+    }, [loadChases])
+  );
+
+  useEffect(() => {
     (async () => {
       const permission = await Location.getForegroundPermissionsAsync();
       if (!permission.granted) {
@@ -63,7 +75,7 @@ export default function ChasesScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-      <Text style={styles.header}>Chasses</Text>
+      <Text style={styles.header}>{t('hunts:catalog.pageHeading')}</Text>
       {error && <Text style={styles.error}>{error}</Text>}
       <FlatList
         data={sorted}
@@ -75,9 +87,9 @@ export default function ChasesScreen() {
           return (
             <Pressable onPress={() => router.push(`/chases/${item.id}`)} style={styles.cardWrap}>
               {item.image ? (
-                <ImageBackground source={{ uri: item.image }} style={styles.cardImage} imageStyle={styles.cardImageStyle}>
+                <StoredImageBackground storedUrl={item.image} style={styles.cardImage} imageStyle={styles.cardImageStyle}>
                   <View style={styles.overlay}>{renderCardContent(item, accepted, distance)}</View>
-                </ImageBackground>
+                </StoredImageBackground>
               ) : (
                 <View style={[styles.cardImage, styles.cardPlain]}>
                   {renderCardContent(item, accepted, distance)}
@@ -86,7 +98,7 @@ export default function ChasesScreen() {
             </Pressable>
           );
         }}
-        ListEmptyComponent={<Text style={styles.empty}>Aucune chasse</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{t('hunts:catalog.mobileEmpty')}</Text>}
       />
     </View>
   );
@@ -96,7 +108,7 @@ export default function ChasesScreen() {
       <>
         <View style={styles.badgeRow}>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{DIFFICULTY_LABELS[item.difficulty] ?? item.difficulty}</Text>
+            <Text style={styles.badgeText}>{t(`hunts:shared.difficultyLabels.${item.difficulty}`)}</Text>
           </View>
           {distance !== null && (
             <View style={[styles.badge, styles.badgeTeal]}>
@@ -105,7 +117,7 @@ export default function ChasesScreen() {
           )}
           {accepted && (
             <View style={[styles.badge, styles.badgeGold]}>
-              <Text style={[styles.badgeText, { color: colors.gold }]}>En cours</Text>
+              <Text style={[styles.badgeText, { color: colors.gold }]}>{t('hunts:catalog.badgeInProgress')}</Text>
             </View>
           )}
         </View>
@@ -115,17 +127,52 @@ export default function ChasesScreen() {
         </Text>
         <View style={styles.bottomRow}>
           <Text style={styles.meta}>
-            {item.steps.length} étapes · {item.estimatedDuration} min
+            {t('hunts:shared.meta.stepsAndDuration', { count: item.steps.length, minutes: item.estimatedDuration })}
           </Text>
-          {!accepted && (
+          {!accepted && canPlayHunts && (
             <Pressable
               style={styles.acceptButton}
+              disabled={joiningId === item.id}
               onPress={(event) => {
                 event.stopPropagation();
-                acceptHunt(item.id);
+                void (async () => {
+                  setJoiningId(item.id);
+                  try {
+                    await acceptHunt(item.id);
+                  } catch (err) {
+                    Alert.alert(t('hunts:shared.errors.joinFailed'), huntJoinErrorMessage(err, t));
+                  } finally {
+                    setJoiningId(null);
+                  }
+                })();
               }}
             >
-              <Text style={styles.acceptText}>Accepter</Text>
+              <Text style={styles.acceptText}>
+                {joiningId === item.id ? '…' : t('common:buttons.accept')}
+              </Text>
+            </Pressable>
+          )}
+          {accepted && canPlayHunts && (
+            <Pressable
+              style={styles.leaveButton}
+              disabled={leavingId === item.id}
+              onPress={(event) => {
+                event.stopPropagation();
+                void (async () => {
+                  setLeavingId(item.id);
+                  try {
+                    await abandonHunt(item.id);
+                  } catch (err) {
+                    Alert.alert(t('hunts:shared.errors.leaveFailed'), huntJoinErrorMessage(err, t));
+                  } finally {
+                    setLeavingId(null);
+                  }
+                })();
+              }}
+            >
+              <Text style={styles.leaveText}>
+                {leavingId === item.id ? '…' : t('hunts:shared.abandon')}
+              </Text>
             </Pressable>
           )}
         </View>
@@ -160,6 +207,14 @@ const styles = StyleSheet.create({
   meta: { color: colors.gold, fontWeight: '700', fontSize: 11 },
   acceptButton: { backgroundColor: colors.gold, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 6 },
   acceptText: { color: colors.background, fontWeight: '900', fontSize: 12 },
+  leaveButton: {
+    borderColor: colors.danger,
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  leaveText: { color: colors.danger, fontWeight: '900', fontSize: 12 },
   error: { color: colors.danger, marginBottom: 12, fontWeight: '700' },
   empty: { textAlign: 'center', marginTop: 24, color: colors.textMuted },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },

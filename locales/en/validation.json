@@ -1,0 +1,62 @@
+{
+  "huntTitleMin": "Title: minimum 3 characters",
+  "huntDescriptionMin": "Description: minimum 10 characters",
+  "huntStepsRequired": "Add at least one step",
+  "stepTitleRequired": "Step {index}: title required",
+  "stepDescriptionRequired": "Step {index}: description required",
+  "stepCoordinatesRequired": "Step {index}: coordinates required",
+  "stepPhotoReferenceRequired": "Step {index}: reference photo required",
+  "hunt": {
+    "basics": {
+      "titleMin": "Title must be at least 3 characters",
+      "descriptionMin": "Description must be at least 10 characters",
+      "imageInvalid": "Upload an image or provide a valid image URL",
+      "partnerIdRequired": "Partner ID is required"
+    },
+    "step": {
+      "titleRequired": "Title is required",
+      "descriptionRequired": "Description is required",
+      "pointsInvalidType": "Points are required",
+      "pointsMin": "Points must be at least 1",
+      "locationRequired": "Set a location using the address lookup or map",
+      "photoAnswerRequired": "Add a reference photo for players to match"
+    },
+    "form": {
+      "stepsMin": "At least one step is required"
+    },
+    "wizard": {
+      "stepsMin": "At least one step is required"
+    }
+  },
+  "auth": {
+    "login": {
+      "emailInvalid": "Invalid email",
+      "passwordMin": "Password must be at least 8 characters"
+    },
+    "register": {
+      "usernameMin": "Username must be at least 3 characters",
+      "emailInvalid": "Invalid email",
+      "passwordMin": "Password must be at least 8 characters",
+      "usernameRequired": "Choose a username."
+    },
+    "totp": {
+      "codeLength": "Code must be 6 digits"
+    },
+    "resetPassword": {
+      "newPasswordMin": "Password must be at least 8 characters",
+      "passwordMinLength": "Password must be at least 8 characters.",
+      "passwordMismatch": "The two passwords do not match.",
+      "invalidToken": "Invalid or expired link. Request a new reset email.",
+      "genericFailed": "Reset failed. Try again later."
+    },
+    "forgotPassword": {
+      "emailInvalid": "Invalid email"
+    }
+  },
+  "stepAnswer": {
+    "incorrect": "Incorrect answer"
+  },
+  "stepPhoto": {
+    "notRecognized": "Photo not recognized"
+  }
+}

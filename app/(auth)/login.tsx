@@ -1,40 +1,38 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Linking } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/src/state/AuthContext';
 import { colors, glassCard, radii } from '@/src/theme';
 
-// Connexion passkey : WebAuthn n'existe pas en natif dans Expo Go, on suit donc
-// le standard RFC 8252 — navigateur système vers la page web dédiée, qui
-// authentifie la passkey du domaine puis renvoie le JWT par deep link
-// (lootopia://auth/callback?token=...), géré par app/auth/callback.tsx.
-// La page web `/auth/mobile` doit lire `redirect_uri` et y rediriger le token.
 const WEB_APP_URL = process.env.EXPO_PUBLIC_WEB_URL ?? 'http://localhost:3000';
 const PASSKEY_LOGIN_URL = `${WEB_APP_URL}/auth/mobile?redirect_uri=${encodeURIComponent('lootopia://auth/callback')}`;
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useTranslation(['auth', 'common']);
   const { signIn, verifyTotp, clearMfaState, loginStage, pendingMethods, resendVerification } = useAuth();
   const [email, setEmail] = useState('player@lootopia.app');
   const [password, setPassword] = useState('password');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Même logique que le web : l'API renvoie des erreurs en texte brut, donc on
-  // branche sur le STATUT HTTP (403 = email non vérifié, 401 = identifiants),
-  // avec repli sur le texte serveur.
   const showAuthError = (authError: any) => {
     const status: number | undefined = authError?.status;
     const text: string = authError?.body ?? authError?.message ?? '';
 
     if (status === 403 || /verif/i.test(text) || /not_verified/i.test(text)) {
-      setError('Ton email n’est pas encore vérifié.');
+      setNeedsVerification(true);
+      setError(t('auth:login.errors.emailNotVerified'));
     } else if (status === 401) {
-      setError('Connexion impossible. Vérifie tes identifiants.');
+      setNeedsVerification(false);
+      setError(t('auth:login.errors.invalidCredentials'));
     } else {
-      setError(text || 'Connexion impossible. Réessaie plus tard.');
+      setNeedsVerification(false);
+      setError(text || t('auth:login.errors.generic'));
     }
   };
 
@@ -49,8 +47,7 @@ export default function LoginScreen() {
           await verifyTotp(code);
           router.replace('/(tabs)/chases');
         } else {
-          // L'API exige une passkey (WebAuthn) : on passe par le navigateur.
-          setInfo('Cette connexion exige une passkey — utilise le bouton ci-dessous.');
+          setInfo(t('auth:login.info.passkeyMfaRequired'));
         }
         return;
       }
@@ -59,9 +56,9 @@ export default function LoginScreen() {
       if (!response.mfaRequired) {
         router.replace('/(tabs)/chases');
       } else if (pendingMethods.includes('totp')) {
-        setInfo('Un code TOTP est requis pour terminer la connexion.');
+        setInfo(t('auth:login.info.totpRequired'));
       } else {
-        setInfo('Une passkey est requise pour ce compte — utilise le bouton passkey ci-dessous.');
+        setInfo(t('auth:login.info.passkeyRequired'));
       }
     } catch (authError: any) {
       showAuthError(authError);
@@ -76,9 +73,9 @@ export default function LoginScreen() {
       setError(null);
       setInfo(null);
       await resendVerification(email);
-      setInfo('Un nouveau lien de vérification a été envoyé.');
+      setInfo(t('auth:login.info.verificationSent'));
     } catch {
-      setError('Impossible de renvoyer le lien de vérification.');
+      setError(t('auth:login.errors.resendFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -93,67 +90,86 @@ export default function LoginScreen() {
   const handlePasskeyLogin = async () => {
     try {
       setError(null);
-      // Navigateur système (jamais une WebView : les passkeys y sont bloquées
-      // et c'est la recommandation RFC 8252). Le retour se fait par deep link.
       await Linking.openURL(PASSKEY_LOGIN_URL);
     } catch {
-      setError('Impossible d’ouvrir le navigateur pour la connexion passkey.');
+      setError(t('auth:login.errors.passkeyBrowserFailed'));
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Lootopia Mobile</Text>
-      <Text style={styles.subtitle}>Accès joueur pour les chasses, les étapes et le compte.</Text>
+      <Text style={styles.title}>{t('auth:login.mobileTitle')}</Text>
+      <Text style={styles.subtitle}>{t('auth:login.mobileSubtitle')}</Text>
 
-      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" placeholderTextColor={colors.textFaint} autoCapitalize="none" />
+      <TextInput
+        style={styles.input}
+        value={email}
+        onChangeText={setEmail}
+        placeholder={t('auth:login.fields.email')}
+        placeholderTextColor={colors.textFaint}
+        autoCapitalize="none"
+      />
 
       {loginStage === 'credentials' ? (
-        <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Mot de passe" placeholderTextColor={colors.textFaint} secureTextEntry />
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder={t('auth:login.fields.password')}
+          placeholderTextColor={colors.textFaint}
+          secureTextEntry
+        />
       ) : (
-        <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="Code TOTP" placeholderTextColor={colors.textFaint} keyboardType="number-pad" />
+        <TextInput
+          style={styles.input}
+          value={code}
+          onChangeText={setCode}
+          placeholder={t('auth:login.fields.totp')}
+          placeholderTextColor={colors.textFaint}
+          keyboardType="number-pad"
+        />
       )}
 
       {error && <Text style={styles.error}>{error}</Text>}
       {info && <Text style={styles.info}>{info}</Text>}
 
       <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleLogin} disabled={isLoading}>
-        <Text style={styles.buttonText}>{loginStage === 'mfa' ? 'Valider le code' : 'Se connecter'}</Text>
+        <Text style={styles.buttonText}>
+          {loginStage === 'mfa' ? t('auth:login.actions.validateCode') : t('auth:login.actions.signIn')}
+        </Text>
       </Pressable>
 
       {loginStage === 'credentials' && (
         <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
-          Mot de passe oublié ?
+          {t('auth:login.links.forgotPassword')}
         </Link>
       )}
 
       <View style={styles.separatorRow}>
         <View style={styles.separatorLine} />
-        <Text style={styles.separatorText}>ou</Text>
+        <Text style={styles.separatorText}>{t('common:or')}</Text>
         <View style={styles.separatorLine} />
       </View>
 
       <Pressable style={[styles.passkeyButton, isLoading && styles.buttonDisabled]} onPress={handlePasskeyLogin} disabled={isLoading}>
-        <Text style={styles.passkeyButtonText}>🔑 Se connecter avec une passkey</Text>
+        <Text style={styles.passkeyButtonText}>{t('auth:login.actions.signInWithPasskeyMobile')}</Text>
       </Pressable>
-      <Text style={styles.passkeyHint}>
-        S’ouvre dans le navigateur : ta passkey du site Lootopia (Face ID / empreinte) te reconnecte ici automatiquement.
-      </Text>
+      <Text style={styles.passkeyHint}>{t('auth:login.passkeyHint')}</Text>
 
       {loginStage === 'mfa' && (
         <Pressable style={styles.linkButton} onPress={handleResetMfa}>
-          <Text style={styles.link}>Revenir aux identifiants</Text>
+          <Text style={styles.link}>{t('auth:login.actions.backToCredentials')}</Text>
         </Pressable>
       )}
 
-      {error?.includes('vérifié') && (
+      {needsVerification && (
         <Pressable style={styles.linkButton} onPress={handleResendVerification} disabled={isLoading}>
-          <Text style={styles.link}>Renvoyer le lien de vérification</Text>
+          <Text style={styles.link}>{t('auth:login.actions.resendVerification')}</Text>
         </Pressable>
       )}
 
       <Link href="/(auth)/register" style={styles.link}>
-        Créer un compte
+        {t('auth:login.links.createAccount')}
       </Link>
     </View>
   );

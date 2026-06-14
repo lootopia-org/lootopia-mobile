@@ -13,10 +13,12 @@ const MIN_MOVE_METERS = 5;
  */
 export function useLiveLocationSync(
   sendLocationRef: MutableRefObject<LocationSender | null>,
-  enabled: boolean
+  enabled: boolean,
+  forceSendRef?: MutableRefObject<(() => void) | null>
 ) {
   const lastSentAt = useRef(0);
   const lastSentPosition = useRef<GeoPoint | null>(null);
+  const lastKnownPosition = useRef<GeoPoint | null>(null);
 
   useEffect(() => {
     if (!enabled) {
@@ -27,6 +29,8 @@ export function useLiveLocationSync(
     let cancelled = false;
 
     const maybeSend = (point: GeoPoint, force = false) => {
+      lastKnownPosition.current = point;
+
       const send = sendLocationRef.current;
       if (!send) {
         return;
@@ -46,6 +50,32 @@ export function useLiveLocationSync(
       lastSentAt.current = now;
       lastSentPosition.current = point;
     };
+
+    const forceSend = () => {
+      if (lastKnownPosition.current) {
+        maybeSend(lastKnownPosition.current, true);
+        return;
+      }
+
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+        .then((update) => {
+          if (cancelled) {
+            return;
+          }
+          maybeSend(
+            {
+              latitude: update.coords.latitude,
+              longitude: update.coords.longitude,
+            },
+            true
+          );
+        })
+        .catch(() => undefined);
+    };
+
+    if (forceSendRef) {
+      forceSendRef.current = forceSend;
+    }
 
     (async () => {
       const permission = await Location.requestForegroundPermissionsAsync();
@@ -88,6 +118,35 @@ export function useLiveLocationSync(
       subscription = null;
       lastSentAt.current = 0;
       lastSentPosition.current = null;
+      if (forceSendRef) {
+        forceSendRef.current = null;
+      }
     };
+  }, [enabled, sendLocationRef, forceSendRef]);
+
+  // When the WebSocket sender becomes available, push the last known position.
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const pushLastKnown = () => {
+      const point = lastKnownPosition.current;
+      const send = sendLocationRef.current;
+      if (!point || !send) {
+        return;
+      }
+      send(point.latitude, point.longitude);
+      lastSentAt.current = Date.now();
+      lastSentPosition.current = point;
+    };
+
+    const interval = setInterval(() => {
+      if (sendLocationRef.current && lastKnownPosition.current) {
+        pushLastKnown();
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
   }, [enabled, sendLocationRef]);
 }

@@ -5,8 +5,7 @@ import type { AuthApiError } from '@/src/lib/auth-api';
  * Contrat Profiles (authentifié, session MFA complète) :
  *   GET    /profile        → profil de l'utilisateur courant
  *   POST   /profile        → création (409 si déjà existant)
- *   PATCH  /profile {huntId} → marque une chasse rejointe comme terminée,
- *                              crédite les points des étapes
+ *   PATCH  /profile {huntId} → marks a joined hunt as finished (no points; use step completion)
  *   DELETE /profile        → suppression du profil
  *   GET    /profile/list   → tous les profils (admin uniquement)
  */

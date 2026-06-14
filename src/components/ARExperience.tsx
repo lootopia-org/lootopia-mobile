@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { StoredImage } from '@/src/components/StoredImage';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useAudioPlayer } from 'expo-audio';
 import * as Location from 'expo-location';
@@ -20,37 +22,21 @@ type ARExperienceProps = {
     longitude: number;
   };
   radiusMeters: number;
-  // Contenu attendu d'un QR code physique validant l'étape (alternative au GPS).
   qrPayload?: string;
-  // Occupe tout l'écran (vue AR immersive) au lieu d'une carte de 460 px.
   fullScreen?: boolean;
-  // Indice photo capturé sur site : révélé uniquement à moins de 15 m.
   photoClueUri?: string;
-  // Indice audio enregistré sur site par l'organisateur.
   audioHintUri?: string;
-  // Overrides live de l'organisateur (Emergency Pause / Redirect).
   liveOverride?: {
     huntPaused?: boolean;
     stepPaused?: boolean;
     redirect?: { location: { latitude: number; longitude: number }; note?: string };
   };
-  // Combat du gardien avant validation (désactivable pour les tests).
   combatEnabled?: boolean;
   onComplete?: (answer?: string) => void;
 };
 
 const PHOTO_CLUE_RADIUS_METERS = 15;
 
-/**
- * Expérience AR-lite (phase "fonctionnalités avancées") :
- * - flux caméra plein cadre
- * - coffre au trésor 3D (three.js sur GLView transparent) superposé au flux,
- *   qui s'ouvre à la validation de l'étape
- * - validation par proximité GPS (rayon de l'étape) OU scan d'un QR code
- *   correspondant à `qrPayload` (utile en intérieur)
- * Le vrai ancrage ARKit/ARCore (ViroReact + dev build) remplacera la
- * superposition fixe sans changer cette interface.
- */
 export function ARExperience({
   clue,
   targetLocation,
@@ -63,6 +49,7 @@ export function ARExperience({
   combatEnabled = true,
   onComplete,
 }: ARExperienceProps) {
+  const { t } = useTranslation('hunts');
   const [permission, requestPermission] = useCameraPermissions();
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -71,11 +58,9 @@ export function ARExperience({
   const [showCombat, setShowCombat] = useState(false);
   const audioPlayer = useAudioPlayer(audioHintUri ?? null);
 
-  // Redirection live : la cible effective remplace celle d'origine.
   const effectiveTarget = liveOverride?.redirect?.location ?? targetLocation;
   const isLiveBlocked = Boolean(liveOverride?.huntPaused || liveOverride?.stepPaused);
 
-  // Lu par la boucle de rendu GL (pas de re-création de scène sur validation).
   const chestOpenRef = useRef(false);
   const frameRef = useRef<number | null>(null);
   const appActiveRef = useAppActiveRef();
@@ -122,7 +107,6 @@ export function ARExperience({
 
   const isWithinRange = distanceMeters !== null && distanceMeters <= radiusMeters;
   const isReadyToValidate = isWithinRange && !isLiveBlocked;
-  // "Photo secrecy" : l'indice photo n'est révélé qu'à moins de 15 m du point.
   const isPhotoClueUnlocked = distanceMeters !== null && distanceMeters <= PHOTO_CLUE_RADIUS_METERS;
 
   const completeStep = (message: string, answer?: string) => {
@@ -137,19 +121,18 @@ export function ARExperience({
 
   const handleValidate = () => {
     if (isLiveBlocked) {
-      setValidationMessage('⛔ Étape suspendue par l’organisateur — réessaie plus tard.');
+      setValidationMessage(t('ar.messages.stepSuspended'));
       return;
     }
     if (!isReadyToValidate) {
-      setValidationMessage('Tu dois être à proximité du point (ou scanner son QR code) avant de valider.');
+      setValidationMessage(t('ar.messages.tooFar'));
       return;
     }
     if (combatEnabled && !hasLaunched) {
-      // Un gardien protège le coffre : duel de timing avant la validation.
       setShowCombat(true);
       return;
     }
-    completeStep('Étape validée — le coffre est à toi !');
+    completeStep(t('ar.messages.validatedChest'));
   };
 
   const pendingAnswerRef = useRef<string | undefined>(undefined);
@@ -159,7 +142,7 @@ export function ARExperience({
       return;
     }
     if (isLiveBlocked) {
-      setValidationMessage('⛔ Étape suspendue par l’organisateur — réessaie plus tard.');
+      setValidationMessage(t('ar.messages.stepSuspended'));
       return;
     }
     const expected = qrPayload ?? null;
@@ -167,19 +150,19 @@ export function ARExperience({
     if (matches) {
       pendingAnswerRef.current = result.data;
       if (combatEnabled) {
-        setValidationMessage('QR code reconnu — mais un gardien protège le coffre !');
+        setValidationMessage(t('ar.messages.qrRecognizedGuardian'));
         setShowCombat(true);
       } else {
-        completeStep('QR code reconnu — étape validée !', result.data);
+        completeStep(t('ar.messages.qrValidated'), result.data);
       }
     } else {
-      setValidationMessage('QR code inconnu pour cette étape.');
+      setValidationMessage(t('ar.messages.qrUnknown'));
     }
   };
 
   const handleCombatWon = () => {
     setShowCombat(false);
-    completeStep('Gardien vaincu — étape validée, le coffre est à toi !', pendingAnswerRef.current);
+    completeStep(t('ar.messages.guardianDefeated'), pendingAnswerRef.current);
   };
 
   const playAudioHint = () => {
@@ -187,7 +170,6 @@ export function ARExperience({
     audioPlayer.play();
   };
 
-  // Scène three.js : coffre au trésor sur fond transparent, couvercle animé.
   const onContextCreate = (gl: any) => {
     const renderer = new Renderer({ gl });
     renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -211,8 +193,7 @@ export function ARExperience({
     const chest = buildChest();
     scene.add(chest.group);
 
-    // 30 fps max + pause complète en arrière-plan (caméra + GL = gros poste batterie).
-    let t = 0;
+    let tick = 0;
     let lastTick = Date.now();
     const shouldRender = createFrameLimiter(30);
 
@@ -222,15 +203,13 @@ export function ARExperience({
         return;
       }
       const now = Date.now();
-      t += Math.min((now - lastTick) / 1000, 0.1);
+      tick += Math.min((now - lastTick) / 1000, 0.1);
       lastTick = now;
       recordFrame('ar-chest');
 
-      // Présentation : lente rotation + flottement.
-      chest.group.rotation.y = Math.sin(t * 0.6) * 0.5;
-      chest.group.position.y = Math.sin(t * 1.4) * 0.05;
+      chest.group.rotation.y = Math.sin(tick * 0.6) * 0.5;
+      chest.group.position.y = Math.sin(tick * 1.4) * 0.05;
 
-      // Ouverture progressive du couvercle à la validation.
       const targetLid = chestOpenRef.current ? -1.7 : 0;
       chest.lid.rotation.x += (targetLid - chest.lid.rotation.x) * 0.06;
 
@@ -251,10 +230,10 @@ export function ARExperience({
   if (!permission.granted) {
     return (
       <View style={styles.permissionCard}>
-        <Text style={styles.permissionTitle}>AR mobile</Text>
-        <Text style={styles.permissionText}>Autorise la caméra pour activer l’expérience AR de la chasse.</Text>
+        <Text style={styles.permissionTitle}>{t('ar.permission.title')}</Text>
+        <Text style={styles.permissionText}>{t('ar.permission.body')}</Text>
         <Pressable style={styles.button} onPress={requestPermission}>
-          <Text style={styles.buttonText}>Autoriser la caméra</Text>
+          <Text style={styles.buttonText}>{t('ar.permission.button')}</Text>
         </Pressable>
       </View>
     );
@@ -269,7 +248,6 @@ export function ARExperience({
         onBarcodeScanned={hasLaunched ? undefined : handleBarcodeScanned}
       />
 
-      {/* Coffre 3D superposé au flux caméra (fond GL transparent). */}
       <View pointerEvents="none" style={styles.chestAnchor}>
         <GLView style={styles.chestCanvas} onContextCreate={onContextCreate} />
       </View>
@@ -278,50 +256,58 @@ export function ARExperience({
         {isLiveBlocked && (
           <View style={styles.liveBanner}>
             <Text style={styles.liveBannerText}>
-              ⛔ {liveOverride?.huntPaused ? 'Chasse suspendue' : 'Étape suspendue'} par l’organisateur
+              {liveOverride?.huntPaused
+                ? t('ar.live.pausedByOrganizer', { scope: t('ar.live.huntPaused') })
+                : t('ar.live.pausedByOrganizer', { scope: t('ar.live.stepPaused') })}
             </Text>
           </View>
         )}
         {liveOverride?.redirect && !isLiveBlocked && (
           <View style={[styles.liveBanner, styles.redirectBanner]}>
             <Text style={styles.redirectBannerText}>
-              📍 Étape déplacée par l’organisateur{liveOverride.redirect.note ? ` — ${liveOverride.redirect.note}` : ''}
+              {t('ar.live.redirect', {
+                note: liveOverride.redirect.note ? ` — ${liveOverride.redirect.note}` : '',
+              })}
             </Text>
           </View>
         )}
-        <Text style={styles.kicker}>AR EXPERIENCE</Text>
-        <Text style={styles.title}>Indice en réalité augmentée</Text>
+        <Text style={styles.kicker}>{t('ar.kicker')}</Text>
+        <Text style={styles.title}>{t('ar.title')}</Text>
         <Text style={styles.text}>{clue}</Text>
 
         {(photoClueUri || audioHintUri) && (
           <View style={styles.cluesRow}>
             {photoClueUri &&
               (isPhotoClueUnlocked ? (
-                <Image source={{ uri: photoClueUri }} style={styles.photoClue} />
+                <StoredImage storedUrl={photoClueUri} style={styles.photoClue} />
               ) : (
                 <View style={styles.photoClueLocked}>
                   <Text style={styles.photoClueLockedIcon}>🔒</Text>
-                  <Text style={styles.photoClueLockedText}>Indice photo à moins de {PHOTO_CLUE_RADIUS_METERS} m</Text>
+                  <Text style={styles.photoClueLockedText}>
+                    {t('ar.clues.photoLocked', { meters: PHOTO_CLUE_RADIUS_METERS })}
+                  </Text>
                 </View>
               ))}
             {audioHintUri && (
               <Pressable style={styles.audioButton} onPress={playAudioHint}>
-                <Text style={styles.audioButtonText}>🔊 Indice audio</Text>
+                <Text style={styles.audioButtonText}>{t('ar.clues.audioButton')}</Text>
               </Pressable>
             )}
           </View>
         )}
         <Text style={styles.statusText}>
           {locationPermissionGranted
-            ? `Position: ${distanceMeters ?? '?'} m du point`
-            : 'Géolocalisation indisponible'}
+            ? t('ar.status.distance', { distance: distanceMeters ?? '?' })
+            : t('ar.status.geoUnavailable')}
         </Text>
-        <Text style={styles.helperText}>
-          {validationMessage || 'Approche-toi du point — ou scanne le QR code de l’étape avec la caméra.'}
-        </Text>
+        <Text style={styles.helperText}>{validationMessage || t('ar.helperDefault')}</Text>
         <Pressable style={[styles.button, !isReadyToValidate && !hasLaunched && styles.buttonDisabled]} onPress={handleValidate}>
           <Text style={styles.buttonText}>
-            {hasLaunched ? 'Étape validée ✓' : isReadyToValidate ? 'Valider l’étape' : 'Validation bloquée'}
+            {hasLaunched
+              ? t('ar.validateButton.validated')
+              : isReadyToValidate
+                ? t('ar.validateButton.ready')
+                : t('ar.validateButton.blocked')}
           </Text>
         </Pressable>
       </View>

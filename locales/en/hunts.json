@@ -1,0 +1,566 @@
+{
+  "shared": {
+    "difficulties": {
+      "all": "All",
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "difficultyLabels": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "statusLabels": {
+      "draft": "Upcoming",
+      "active": "Active",
+      "paused": "Paused",
+      "archived": "Archived"
+    },
+    "statusSelect": {
+      "draft": "Draft",
+      "active": "Active",
+      "paused": "Paused",
+      "archived": "Archived"
+    },
+    "duration": {
+      "minutes": "{minutes} min",
+      "hoursMinutes": "{hours}h {minutes}m",
+      "hoursOnly": "{hours}h"
+    },
+    "points": {
+      "short": "{points} pts",
+      "awarded": "Awarded when players complete this step"
+    },
+    "pause": {
+      "pauseHunt": "Pause hunt",
+      "resumeHunt": "Resume hunt",
+      "pause": "Pause",
+      "resume": "Resume",
+      "pausedMessage": "This hunt is currently paused. Gameplay is temporarily unavailable.",
+      "toasts": {
+        "paused": "Hunt paused",
+        "resumed": "Hunt resumed",
+        "failedPause": "Failed to pause hunt",
+        "failedResume": "Failed to resume hunt",
+        "statusUpdateFailed": "Status update failed"
+      }
+    },
+    "delete": {
+      "confirm": "Delete \"{title}\"?",
+      "confirmPermanent": "Delete \"{title}\"? This cannot be undone.",
+      "deleted": "Hunt deleted",
+      "deleteFailed": "Delete failed"
+    },
+    "status": {
+      "inProgress": "In progress",
+      "paused": "Paused",
+      "pausedByOrganizer": "⛔ Suspended by organizer",
+      "completed": " · Completed 🎉"
+    },
+    "meta": {
+      "stepsAndDuration": "{count} steps · {minutes} min",
+      "stepProgress": "Step {current}/{total}",
+      "stepProgressWithTitle": "Step {current}/{total} · {stepTitle}",
+      "detailDifficulty": "Difficulty: {difficulty}",
+      "detailDuration": "Duration: {minutes} min",
+      "detailOrganizer": "Organizer: {name}",
+      "progressCounter": "{current} / {total}"
+    },
+    "sections": {
+      "detail": "Details",
+      "map": "Map",
+      "steps": "Steps"
+    },
+    "abandon": "Abandon hunt",
+    "errors": {
+      "notFound": "Hunt not found",
+      "stepNotFound": "Step not found",
+      "missingCoordinates": "Missing coordinates",
+      "startFailed": "Could not start",
+      "loadFailed": "Could not load",
+      "notAuthenticated": "Sign in to join hunts",
+      "playerOnlyJoin": "Only player accounts can join hunts",
+      "joinFailed": "Could not join hunt",
+      "leaveFailed": "Could not leave hunt"
+    }
+  },
+  "stepTypes": {
+    "checkpoint": "GPS checkpoint",
+    "riddle": "Riddle",
+    "qr_code": "QR code",
+    "clue": "Clue",
+    "ar": "AR treasure",
+    "photo": "Photo"
+  },
+  "stepTypeOptions": {
+    "checkpoint": {
+      "label": "Checkpoint (GPS)",
+      "description": "Players must physically reach this location"
+    },
+    "riddle": {
+      "label": "Riddle",
+      "description": "Solve a riddle when arriving at this location"
+    },
+    "qr_code": {
+      "label": "QR Code",
+      "description": "Scan a QR code placed at this location"
+    },
+    "clue": {
+      "label": "Clue",
+      "description": "Discover a clue hidden at this location"
+    },
+    "ar": {
+      "label": "AR Treasure",
+      "description": "Reveal augmented-reality loot at this location in the app"
+    },
+    "photo": {
+      "label": "Photo match",
+      "description": "Players take a matching photo at this location to complete the step"
+    }
+  },
+  "stepActions": {
+    "checkpoint": "Go there",
+    "riddle": "Answer",
+    "qr_code": "Scan",
+    "clue": "Discover",
+    "ar": "Open AR",
+    "photo": "Take photo",
+    "default": "Start"
+  },
+  "liveEvents": {
+    "huntSuspendedTitle": "Hunt suspended"
+  },
+  "catalog": {
+    "heading": "Hunt catalog",
+    "catalogAccent": "catalog",
+    "pageHeading": "Hunts",
+    "subhead": "Preview available treasure hunts. Download the app to play.",
+    "searchPlaceholder": "Search hunts…",
+    "guest": {
+      "heading": "Hunt catalog",
+      "message": "Sign in to browse available treasure hunts. Download the app to play.",
+      "signIn": "Sign in to browse"
+    },
+    "empty": "No hunts match your filters.",
+    "mobileEmpty": "No hunts",
+    "badgeInProgress": "In progress",
+    "errors": {
+      "loadFailed": "Unable to load hunts. Please try again later."
+    }
+  },
+  "list": {
+    "heading": "In progress",
+    "empty": {
+      "title": "No hunt in progress",
+      "cta": "Browse hunts"
+    }
+  },
+  "detail": {
+    "signInPrompt": "Sign in to view hunt details.",
+    "signIn": "Sign in",
+    "notFound": "Hunt not found or unavailable.",
+    "backToCatalog": "Back to catalog",
+    "bannerInProgress": "In progress",
+    "primaryAction": {
+      "launch": "Launch",
+      "continue": "Continue"
+    },
+    "heatmap": {
+      "title": "Player activity heatmap",
+      "legend": {
+        "stepCompletions": "Step completions (size = popularity)",
+        "recentLocations": "Recent player locations"
+      },
+      "stats": "{participantCount} participants · {completedCount} finished",
+      "topSteps": "{order}. {title}",
+      "visits": "{count} visits",
+      "empty": "No location data yet — completions will appear here as players progress.",
+      "tooltip": {
+        "recentPlayer": "Recent player location",
+        "completions": "{count} completion{suffix}"
+      }
+    },
+    "steps": {
+      "title": "Steps ({count})",
+      "participantsLabel": "Participants"
+    },
+    "sidebar": {
+      "stepMeta": "{stepCount} steps · {totalPoints} points",
+      "downloadToPlay": "Download app to play",
+      "requiresApp": "Gameplay requires the Lootopia mobile app"
+    },
+    "downloadBanner": {
+      "title": "Ready to hunt?",
+      "description": "This adventure is waiting for you in the Lootopia app. GPS, AR, and riddles come alive on mobile."
+    },
+    "sectionDetail": "Details",
+    "sectionMap": "Map",
+    "sectionSteps": "Steps",
+    "difficulty": "Difficulty: {value}",
+    "duration": "Duration: {minutes} min",
+    "organizer": "Organizer: {name}",
+    "stepProgress": "Step {current}/{total}"
+  },
+  "cards": {
+    "partnerPrefix": "Partner: {partnerIdPrefix}…",
+    "viewDetails": "View details"
+  },
+  "participants": {
+    "title": "Participants ({count})",
+    "joined": "Joined {date}",
+    "status": {
+      "completed": "Completed",
+      "inProgress": "In progress"
+    },
+    "points": "{points} pts",
+    "loadFailed": "Unable to load participants.",
+    "empty": "No participants yet."
+  },
+  "wizard": {
+    "pages": {
+      "create": {
+        "back": "Back to studio",
+        "heading": "Create new hunt"
+      },
+      "edit": {
+        "back": "Back to studio",
+        "heading": "Edit hunt",
+        "notFound": "Hunt not found."
+      }
+    },
+    "steps": {
+      "basics": "Basics",
+      "steps": "Steps",
+      "review": "Review"
+    },
+    "basics": {
+      "title": "Hunt basics",
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "coverImage": "Cover image",
+        "coverImageDescription": "Upload an image for the hunt card and detail page.",
+        "difficulty": "Difficulty",
+        "durationMin": "Duration (min)",
+        "status": "Status",
+        "partnerId": "Partner ID"
+      }
+    },
+    "stepEditor": {
+      "stepTitle": "Step {number}",
+      "aria": {
+        "moveUp": "Move step up",
+        "moveDown": "Move step down"
+      },
+      "fields": {
+        "type": "Type",
+        "title": "Title",
+        "points": "Points",
+        "description": "Description",
+        "answer": "Answer"
+      },
+      "answerPlaceholder": "Clue, code, riddle solution, QR payload, or any verification value",
+      "answerHint": "Optional verification value used across all step types.",
+      "addStep": "Add step"
+    },
+    "location": {
+      "heading": "Location",
+      "address": "Address",
+      "addressPlaceholder": "e.g. 1 Market St, San Francisco, CA",
+      "lookup": "Look up",
+      "lookingUp": "Looking up…",
+      "hint": "Enter an address to fetch coordinates, or fine-tune by clicking the map.",
+      "toasts": {
+        "enterAddress": "Enter an address first",
+        "found": "Location found",
+        "lookupFailed": "Address lookup failed",
+        "geocodeFailed": "Failed to look up address"
+      }
+    },
+    "photoCapture": {
+      "heading": "Capture on your phone",
+      "description": "Open Lootopia Mobile on your phone, scan the QR code, and take the reference photo on-site. It will appear here automatically.",
+      "referencePhoto": {
+        "label": "Reference photo",
+        "description": "Take a photo on-site or upload a reference image players must match."
+      },
+      "actions": {
+        "starting": "Starting…",
+        "usePhoneCamera": "Use phone camera",
+        "cancelCapture": "Cancel capture",
+        "startNewCapture": "Start a new capture"
+      },
+      "status": {
+        "waiting": "Waiting for photo from your phone…",
+        "received": "Photo received from your phone."
+      },
+      "qr": {
+        "alt": "QR code to open mobile capture",
+        "expoHint": "Expo Go link (scan with your phone camera):",
+        "signInHint": "Sign in on mobile with the same partner account, then scan this QR or open:"
+      },
+      "errors": {
+        "startFailed": "Could not start mobile capture",
+        "refreshFailed": "Could not refresh capture session",
+        "sessionExpired": "Session expired — sign in again on web and start a new capture."
+      },
+      "captureRedirect": {
+        "invalidTitle": "Invalid capture link",
+        "invalidMessage": "Start a new capture from the hunt wizard on web.",
+        "expoTitle": "Open in Expo Go",
+        "expoMessage": "Open Lootopia Mobile in Expo Go first (same tunnel), then tap the button below. Sign in with your partner account before taking the photo.",
+        "openCapture": "Open capture in Lootopia Mobile"
+      }
+    },
+    "arPreview": {
+      "message": "AR preview — players will discover this treasure at the mapped location in the mobile app."
+    },
+    "review": {
+      "title": "Review & publish",
+      "badges": {
+        "steps": "{count} steps",
+        "totalPoints": "{totalPoints} total points"
+      },
+      "stepLine": "{number}. {title} ({stepType}) · {points} pts",
+      "referencePhotoAttached": "Reference photo attached",
+      "answer": "Answer: {answer}",
+      "referencePhotoAlt": "Reference photo"
+    },
+    "navigation": {
+      "back": "Back",
+      "next": "Next",
+      "createHunt": "Create hunt",
+      "saveChanges": "Save changes"
+    },
+    "toasts": {
+      "created": "Hunt created!",
+      "updated": "Hunt updated!",
+      "saveFailed": "Failed to save hunt",
+      "fixFields": "Please fix the highlighted fields",
+      "completeSteps": "Please complete all hunt steps"
+    }
+  },
+  "editor": {
+    "note": "Mobile partner hunt editor (distinct from web wizard)"
+  },
+  "imagePicker": {
+    "defaultLabel": "Image",
+    "emptyWithCamera": "Take a photo or upload from your device",
+    "emptyUpload": "Upload an image from your device",
+    "uploading": "Uploading…",
+    "processing": "Processing…",
+    "takePhoto": "Take photo",
+    "uploadImage": "Upload image",
+    "selectedAlt": "Selected reference",
+    "preview": {
+      "unavailable": "Preview unavailable",
+      "loading": "Loading preview…"
+    },
+    "toasts": {
+      "uploaded": "Image uploaded",
+      "uploadFailed": "Image upload failed"
+    }
+  },
+  "ar": {
+    "permission": {
+      "title": "Mobile AR",
+      "body": "Allow camera access to enable the hunt AR experience.",
+      "button": "Allow camera"
+    },
+    "kicker": "AR EXPERIENCE",
+    "title": "Augmented reality clue",
+    "live": {
+      "huntPaused": "Hunt suspended",
+      "stepPaused": "Step suspended",
+      "pausedByOrganizer": "⛔ {scope} by organizer",
+      "redirect": "📍 Step moved by organizer{note}"
+    },
+    "clues": {
+      "photoLocked": "Photo clue within {meters} m",
+      "audioButton": "🔊 Audio clue"
+    },
+    "status": {
+      "distance": "Position: {distance} m from point",
+      "geoUnavailable": "Geolocation unavailable"
+    },
+    "helperDefault": "Get closer to the point — or scan the step QR code with the camera.",
+    "validateButton": {
+      "validated": "Step validated ✓",
+      "ready": "Validate step",
+      "blocked": "Validation blocked"
+    },
+    "messages": {
+      "stepSuspended": "⛔ Step suspended by organizer — try again later.",
+      "tooFar": "You must be near the point (or scan its QR code) before validating.",
+      "validatedChest": "Step validated — the chest is yours!",
+      "qrRecognizedGuardian": "QR code recognized — but a guardian protects the chest!",
+      "qrValidated": "QR code recognized — step validated!",
+      "qrUnknown": "Unknown QR code for this step.",
+      "guardianDefeated": "Guardian defeated — step validated, the chest is yours!",
+      "pointsEarned": "+{points} pts",
+      "huntCompleted": "Hunt complete!",
+      "mustBeNear": "You must be near the point (or scan its QR code) before validating.",
+      "stepValidatedChest": "Step validated — the chest is yours!",
+      "qrRecognizedValidated": "QR code recognized — step validated!"
+    },
+    "answerInput": {
+      "riddlePlaceholder": "Answer",
+      "cluePlaceholder": "Clue / code"
+    },
+    "permissionTitle": "Mobile AR",
+    "permissionText": "Allow camera access to enable the hunt AR experience.",
+    "allowCamera": "Allow camera",
+    "huntSuspendedBanner": "Hunt suspended",
+    "stepSuspendedBanner": "Step suspended",
+    "stepRedirected": "📍 Step moved by organizer{note}",
+    "photoClueLocked": "Photo clue within {meters} m",
+    "audioHint": "🔊 Audio clue",
+    "positionFromPoint": "Position: {distance} m from point",
+    "geoUnavailable": "Geolocation unavailable",
+    "defaultHelper": "Get closer to the point — or scan the step QR code with the camera.",
+    "stepValidated": "Step validated ✓",
+    "validateStep": "Validate step",
+    "validationBlocked": "Validation blocked"
+  },
+  "combat": {
+    "title": "Guardian combat",
+    "hp": {
+      "guardian": "Guardian",
+      "you": "You"
+    },
+    "messages": {
+      "intro": "A guardian protects the chest!",
+      "hit": "Hit! The guardian staggers…",
+      "miss": "Miss! The guardian counterattacks.",
+      "guardianWins": "The guardian pushed you back…",
+      "playerWins": "Guardian defeated! The chest is yours.",
+      "retryIntro": "The guardian rises again — your turn!",
+      "missed": "Miss! The guardian counterattacks.",
+      "repelled": "The guardian pushed you back…",
+      "won": "Guardian defeated! The chest is yours.",
+      "retry": "The guardian rises again — your turn!"
+    },
+    "buttons": {
+      "strike": "⚔️ Strike!",
+      "flee": "Flee combat",
+      "openChest": "Open the chest 🪙",
+      "retry": "Retry",
+      "giveUp": "Give up"
+    },
+    "guardianLabel": "Guardian",
+    "youLabel": "You",
+    "strike": "⚔️ Strike!",
+    "flee": "Flee combat",
+    "openChest": "Open the chest 🪙",
+    "giveUp": "Give up"
+  },
+  "stepAnswer": {
+    "defaultPlaceholder": "Answer",
+    "validated": "Validated ✓",
+    "errorIncorrect": "Incorrect answer"
+  },
+  "stepPhoto": {
+    "takePhoto": "Take a photo",
+    "retake": "Retake",
+    "send": "Send",
+    "capture": "Capture",
+    "validated": "Step validated ✓",
+    "errors": {
+      "cameraDenied": "Camera permission denied.",
+      "captureFailed": "Capture failed",
+      "notRecognized": "Photo not recognized"
+    }
+  },
+  "capture": {
+    "loginRequired": "Sign-in required",
+    "invalidLink": "Invalid link",
+    "overlay": {
+      "title": "Reference photo",
+      "hintCapture": "Frame the clue on site, then take the photo.",
+      "hintReview": "Review the photo then send it to the web wizard."
+    },
+    "errors": {
+      "cameraDenied": "Camera permission denied.",
+      "captureFailed": "Capture failed, try again.",
+      "uploadFailed": "Upload failed.",
+      "wrongAccount": "Sign in with the same partner account as on the web.",
+      "sessionExpired": "Session expired — restart capture from the web wizard."
+    },
+    "captureFailed": "Capture failed, try again.",
+    "uploadFailed": "Upload failed.",
+    "wrongAccount": "Sign in with the same partner account as on the web.",
+    "sessionExpired": "Session expired — restart capture from the web wizard.",
+    "loginRequiredText": "Sign in with your partner account to send the reference photo.",
+    "scanQrHint": "Scan the QR code from the web wizard.",
+    "referencePhoto": "Reference photo",
+    "reviewHint": "Review the photo then send it to the web wizard.",
+    "frameHint": "Frame the clue on site, then take the photo."
+  },
+  "title": "Hunts",
+  "empty": "No hunts",
+  "notFound": "Hunt not found",
+  "stepNotFound": "Step not found",
+  "missingCoordinates": "Missing coordinates",
+  "startFailed": "Could not start",
+  "inProgressBadge": "In progress",
+  "stepsMeta": "{count} steps · {duration} min",
+  "inProgress": {
+    "title": "In progress",
+    "empty": "No hunt in progress",
+    "browseCta": "Browse hunts",
+    "suspendedByOrganizer": "⛔ Suspended by organizer",
+    "playerPaused": "Paused",
+    "stepProgress": "Step {current}/{total}",
+    "completed": " · Completed 🎉",
+    "resumeButton": "▶ Resume",
+    "pauseButton": "⏸ Pause",
+    "abandon": "Abandon hunt"
+  },
+  "field": {
+    "organizersOnly": "Organizers only",
+    "title": "Field",
+    "myHunts": "My hunts",
+    "newHuntHere": "New hunt here",
+    "noHunts": "No hunts",
+    "stepsCount": "{count} steps",
+    "participants": "{count} participants",
+    "showSteps": "Steps ▼",
+    "hideSteps": "Hide ▲",
+    "cancelRedirect": "Cancel",
+    "redirectHere": "Redirect here",
+    "cells": "Cells",
+    "points": "Points",
+    "noData": "No data",
+    "clear": "Clear"
+  },
+  "audioHint": {
+    "startFailed": "Could not start recording.",
+    "recordFailed": "Recording failed.",
+    "stop": "■ Stop",
+    "rerecord": "🎙 Re-record audio clue",
+    "record10s": "🎙 10 s audio clue",
+    "listen": "▶ Listen"
+  },
+  "photoClue": {
+    "tooFar": "Get within 15 m of the point (you are {distance} away).",
+    "secretPhoto": "📷 Secret photo",
+    "retakeSecretPhoto": "📷 Retake secret photo"
+  },
+  "photoReference": {
+    "required": "Reference photo required"
+  },
+  "stepInput": {
+    "takePhoto": "Take a photo",
+    "stepValidated": "Step validated ✓",
+    "photoNotRecognized": "Photo not recognized",
+    "wrongAnswer": "Incorrect answer"
+  },
+  "map": {
+    "zoneTitle": "Hunt zone",
+    "zoneDescription": "Starting point or reference area",
+    "title": "Hunt map",
+    "positionShown": "Your real position is shown on the map.",
+    "activatingGps": "Enabling geolocation…"
+  }
+}

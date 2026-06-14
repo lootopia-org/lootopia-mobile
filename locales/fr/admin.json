@@ -1,0 +1,48 @@
+{
+  "console": {
+    "heading": "Console admin",
+    "subhead": "Vue d’ensemble et gestion de la plateforme",
+    "cards": {
+      "playerProfiles": "Profils joueurs",
+      "treasureHunts": "Chasses au trésor",
+      "viewAllProfiles": "Voir tous les profils →",
+      "manageHunts": "Gérer les chasses →"
+    },
+    "quickLinks": {
+      "profiles": "Profils",
+      "hunts": "Chasses",
+      "createHunt": "Créer une chasse"
+    }
+  },
+  "profiles": {
+    "back": "Retour à l’admin",
+    "heading": "Profils joueurs",
+    "tableTitle": "Tous les profils ({count})",
+    "columns": {
+      "username": "Nom d’utilisateur",
+      "email": "Email",
+      "points": "Points",
+      "level": "Niveau",
+      "completed": "Terminées",
+      "actions": "Actions"
+    },
+    "empty": "Aucun profil pour le moment.",
+    "toasts": {
+      "invalidNumbers": "Saisissez des nombres valides pour points, niveau et chasses terminées.",
+      "updated": "Profil mis à jour",
+      "updateFailed": "Échec de la mise à jour du profil"
+    }
+  },
+  "hunts": {
+    "back": "Retour à l’admin",
+    "heading": "Gérer les chasses",
+    "createHunt": "Créer une chasse",
+    "tableTitle": "Toutes les chasses ({count})",
+    "meta": "{stepCount} étapes · {duration} · Partenaire {partnerIdPrefix}…",
+    "actions": {
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "empty": "Aucune chasse pour le moment."
+  }
+}

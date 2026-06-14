@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import { huntJoinErrorMessage } from '@/src/lib/hunt-join-errors';
 import { useHunts } from '@/src/state/HuntsContext';
 import { useLiveEventsContext } from '@/src/state/LiveEventsContext';
 import { colors, glassCard, radii } from '@/src/theme';
@@ -10,7 +12,8 @@ import { colors, glassCard, radii } from '@/src/theme';
 export default function InProgressScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { acceptedHunts, abandonHunt, setHuntPaused } = useHunts();
+  const { t } = useTranslation(['hunts', 'common']);
+  const { acceptedHunts, abandonHunt, setHuntPaused, canPlayHunts, refreshFromServer } = useHunts();
   const { subscribeHuntEvents } = useLiveEventsContext();
   const [hunts, setHunts] = useState<Chase[]>([]);
 
@@ -19,25 +22,35 @@ export default function InProgressScreen() {
   }, []);
 
   useEffect(() => {
+    if (canPlayHunts) {
+      void refreshFromServer();
+    }
     loadHunts();
-  }, [loadHunts]);
+  }, [canPlayHunts, loadHunts, refreshFromServer]);
 
   useEffect(() => subscribeHuntEvents(() => loadHunts()), [subscribeHuntEvents, loadHunts]);
 
-  const inProgress = hunts;
+  useFocusEffect(
+    useCallback(() => {
+      if (canPlayHunts) {
+        void refreshFromServer();
+      }
+      loadHunts();
+    }, [canPlayHunts, loadHunts, refreshFromServer])
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-      <Text style={styles.header}>En cours</Text>
+      <Text style={styles.header}>{t('hunts:list.heading')}</Text>
 
       <FlatList
-        data={inProgress}
+        data={hunts}
         keyExtractor={(hunt) => hunt.id}
         contentContainerStyle={{ paddingBottom: 24, gap: 12 }}
         ListEmptyComponent={
           <Pressable style={styles.emptyCard} onPress={() => router.push('/(tabs)/chases')}>
-            <Text style={styles.emptyText}>Aucune chasse en cours</Text>
-            <Text style={styles.emptyCta}>Voir les chasses</Text>
+            <Text style={styles.emptyText}>{t('hunts:list.empty.title')}</Text>
+            <Text style={styles.emptyCta}>{t('hunts:list.empty.cta')}</Text>
           </Pressable>
         }
         renderItem={({ item: hunt }) => {
@@ -55,11 +68,11 @@ export default function InProgressScreen() {
                 <Text style={styles.cardTitle}>{hunt.title}</Text>
                 {livePaused ? (
                   <View style={[styles.statusPill, styles.statusPillDanger]}>
-                    <Text style={styles.statusPillDangerText}>⛔ Suspendue par l'organisateur</Text>
+                    <Text style={styles.statusPillDangerText}>{t('hunts:shared.status.pausedByOrganizer')}</Text>
                   </View>
                 ) : playerPaused ? (
                   <View style={styles.statusPill}>
-                    <Text style={styles.statusPillText}>⏸ En pause</Text>
+                    <Text style={styles.statusPillText}>{t('hunts:shared.status.paused')}</Text>
                   </View>
                 ) : null}
               </View>
@@ -68,8 +81,8 @@ export default function InProgressScreen() {
               </View>
               <View style={styles.cardRow}>
                 <Text style={styles.cardMeta}>
-                  Étape {Math.min(completed + 1, total)}/{total}
-                  {nextStep ? ` · ${nextStep.title}` : ' · Terminée 🎉'}
+                  {t('hunts:shared.meta.stepProgress', { current: Math.min(completed + 1, total), total })}
+                  {nextStep ? ` · ${nextStep.title}` : t('hunts:shared.status.completed')}
                 </Text>
                 <View style={styles.actionsRow}>
                   {!livePaused && (
@@ -77,7 +90,9 @@ export default function InProgressScreen() {
                       style={styles.pauseButton}
                       onPress={() => setHuntPaused(hunt.id, !playerPaused)}
                     >
-                      <Text style={styles.pauseText}>{playerPaused ? '▶ Reprendre' : '⏸ Pause'}</Text>
+                      <Text style={styles.pauseText}>
+                        {playerPaused ? t('common:buttons.resumeIcon') : t('common:buttons.pause')}
+                      </Text>
                     </Pressable>
                   )}
                   <Pressable
@@ -85,12 +100,26 @@ export default function InProgressScreen() {
                     disabled={playerPaused || livePaused}
                     onPress={() => router.push(`/chases/${hunt.id}`)}
                   >
-                    <Text style={styles.resumeText}>Jouer</Text>
+                    <Text style={styles.resumeText}>{t('common:buttons.play')}</Text>
                   </Pressable>
                 </View>
               </View>
-              <Pressable onPress={() => abandonHunt(hunt.id)}>
-                <Text style={styles.abandon}>Abandonner la chasse</Text>
+              <Pressable
+                onPress={() => {
+                  void (async () => {
+                    try {
+                      await abandonHunt(hunt.id);
+                      loadHunts();
+                    } catch (err) {
+                      Alert.alert(
+                        t('hunts:shared.errors.leaveFailed'),
+                        huntJoinErrorMessage(err, t)
+                      );
+                    }
+                  })();
+                }}
+              >
+                <Text style={styles.abandon}>{t('hunts:shared.abandon')}</Text>
               </Pressable>
             </View>
           );

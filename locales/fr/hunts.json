@@ -1,0 +1,566 @@
+{
+  "shared": {
+    "difficulties": {
+      "all": "Toutes",
+      "easy": "Facile",
+      "medium": "Moyenne",
+      "hard": "Difficile"
+    },
+    "difficultyLabels": {
+      "easy": "Facile",
+      "medium": "Moyenne",
+      "hard": "Difficile"
+    },
+    "statusLabels": {
+      "draft": "À venir",
+      "active": "Active",
+      "paused": "En pause",
+      "archived": "Archivée"
+    },
+    "statusSelect": {
+      "draft": "Brouillon",
+      "active": "Active",
+      "paused": "En pause",
+      "archived": "Archivée"
+    },
+    "duration": {
+      "minutes": "{minutes} min",
+      "hoursMinutes": "{hours}h {minutes}m",
+      "hoursOnly": "{hours}h"
+    },
+    "points": {
+      "short": "{points} pts",
+      "awarded": "Attribués quand les joueurs terminent cette étape"
+    },
+    "pause": {
+      "pauseHunt": "Mettre en pause",
+      "resumeHunt": "Reprendre la chasse",
+      "pause": "Pause",
+      "resume": "Resume",
+      "pausedMessage": "Cette chasse est actuellement en pause. Le jeu est temporairement indisponible.",
+      "toasts": {
+        "paused": "Chasse mise en pause",
+        "resumed": "Chasse reprise",
+        "failedPause": "Impossible de mettre en pause",
+        "failedResume": "Impossible de reprendre",
+        "statusUpdateFailed": "Échec de la mise à jour du statut"
+      }
+    },
+    "delete": {
+      "confirm": "Supprimer « {title} » ?",
+      "confirmPermanent": "Supprimer « {title} » ? Cette action est irréversible.",
+      "deleted": "Chasse supprimée",
+      "deleteFailed": "Échec de la suppression"
+    },
+    "status": {
+      "inProgress": "En cours",
+      "paused": "En pause",
+      "pausedByOrganizer": "⛔ Suspendue par l’organisateur",
+      "completed": " · Terminée 🎉"
+    },
+    "meta": {
+      "stepsAndDuration": "{count} étapes · {minutes} min",
+      "stepProgress": "Étape {current}/{total}",
+      "stepProgressWithTitle": "Étape {current}/{total} · {stepTitle}",
+      "detailDifficulty": "Difficulté : {difficulty}",
+      "detailDuration": "Durée : {minutes} min",
+      "detailOrganizer": "Organisateur : {name}",
+      "progressCounter": "{current} / {total}"
+    },
+    "sections": {
+      "detail": "Détail",
+      "map": "Carte",
+      "steps": "Étapes"
+    },
+    "abandon": "Abandonner la chasse",
+    "errors": {
+      "notFound": "Chasse introuvable",
+      "stepNotFound": "Étape introuvable",
+      "missingCoordinates": "Coordonnées manquantes",
+      "startFailed": "Impossible de démarrer",
+      "loadFailed": "Chargement impossible",
+      "notAuthenticated": "Connectez-vous pour rejoindre une chasse",
+      "playerOnlyJoin": "Seuls les comptes joueur peuvent rejoindre une chasse",
+      "joinFailed": "Impossible de rejoindre la chasse",
+      "leaveFailed": "Impossible de quitter la chasse"
+    }
+  },
+  "stepTypes": {
+    "checkpoint": "Checkpoint GPS",
+    "riddle": "Énigme",
+    "qr_code": "QR code",
+    "clue": "Indice",
+    "ar": "Trésor AR",
+    "photo": "Photo"
+  },
+  "stepTypeOptions": {
+    "checkpoint": {
+      "label": "Checkpoint (GPS)",
+      "description": "Les joueurs doivent atteindre physiquement cet endroit"
+    },
+    "riddle": {
+      "label": "Énigme",
+      "description": "Résolvez une énigme en arrivant sur place"
+    },
+    "qr_code": {
+      "label": "QR Code",
+      "description": "Scannez un QR code placé sur place"
+    },
+    "clue": {
+      "label": "Indice",
+      "description": "Découvrez un indice caché sur place"
+    },
+    "ar": {
+      "label": "Trésor AR",
+      "description": "Révélez du butin en réalité augmentée sur place dans l’app"
+    },
+    "photo": {
+      "label": "Photo correspondante",
+      "description": "Les joueurs prennent une photo correspondante sur place pour valider l’étape"
+    }
+  },
+  "stepActions": {
+    "checkpoint": "Y aller",
+    "riddle": "Répondre",
+    "qr_code": "Scanner",
+    "clue": "Découvrir",
+    "ar": "Ouvrir AR",
+    "photo": "Photographier",
+    "default": "Commencer"
+  },
+  "liveEvents": {
+    "huntSuspendedTitle": "Chasse suspendue"
+  },
+  "catalog": {
+    "heading": "Catalogue de chasses",
+    "catalogAccent": "catalogue",
+    "pageHeading": "Chasses",
+    "subhead": "Aperçu des chasses disponibles. Téléchargez l’app pour jouer.",
+    "searchPlaceholder": "Rechercher des chasses…",
+    "guest": {
+      "heading": "Catalogue de chasses",
+      "message": "Connectez-vous pour parcourir les chasses. Téléchargez l’app pour jouer.",
+      "signIn": "Se connecter pour parcourir"
+    },
+    "empty": "Aucune chasse ne correspond à vos filtres.",
+    "mobileEmpty": "Aucune chasse",
+    "badgeInProgress": "En cours",
+    "errors": {
+      "loadFailed": "Impossible de charger les chasses. Réessayez plus tard."
+    }
+  },
+  "list": {
+    "heading": "En cours",
+    "empty": {
+      "title": "Aucune chasse en cours",
+      "cta": "Voir les chasses"
+    }
+  },
+  "detail": {
+    "signInPrompt": "Connectez-vous pour voir les détails de la chasse.",
+    "signIn": "Se connecter",
+    "notFound": "Chasse introuvable ou indisponible.",
+    "backToCatalog": "Retour au catalogue",
+    "bannerInProgress": "En cours",
+    "primaryAction": {
+      "launch": "Lancer",
+      "continue": "Continuer"
+    },
+    "heatmap": {
+      "title": "Carte de chaleur d’activité",
+      "legend": {
+        "stepCompletions": "Étapes complétées (taille = popularité)",
+        "recentLocations": "Positions récentes des joueurs"
+      },
+      "stats": "{participantCount} participants · {completedCount} terminés",
+      "topSteps": "{order}. {title}",
+      "visits": "{count} visites",
+      "empty": "Pas encore de données — les complétions apparaîtront au fur et à mesure.",
+      "tooltip": {
+        "recentPlayer": "Position récente d’un joueur",
+        "completions": "{count} complétion{suffix}"
+      }
+    },
+    "steps": {
+      "title": "Étapes ({count})",
+      "participantsLabel": "Participants"
+    },
+    "sidebar": {
+      "stepMeta": "{stepCount} étapes · {totalPoints} points",
+      "downloadToPlay": "Télécharger l’app pour jouer",
+      "requiresApp": "Le jeu nécessite l’app mobile Lootopia"
+    },
+    "downloadBanner": {
+      "title": "Prêt à chasser ?",
+      "description": "Cette aventure vous attend dans l’app Lootopia. GPS, AR et énigmes prennent vie sur mobile."
+    },
+    "sectionDetail": "Détail",
+    "sectionMap": "Carte",
+    "sectionSteps": "Étapes",
+    "difficulty": "Difficulté : {value}",
+    "duration": "Durée : {minutes} min",
+    "organizer": "Organisateur : {name}",
+    "stepProgress": "Étape {current}/{total}"
+  },
+  "cards": {
+    "partnerPrefix": "Partenaire : {partnerIdPrefix}…",
+    "viewDetails": "Voir les détails"
+  },
+  "participants": {
+    "title": "Participants ({count})",
+    "joined": "Rejoint le {date}",
+    "status": {
+      "completed": "Terminé",
+      "inProgress": "En cours"
+    },
+    "points": "{points} pts",
+    "loadFailed": "Impossible de charger les participants.",
+    "empty": "Aucun participant pour le moment."
+  },
+  "wizard": {
+    "pages": {
+      "create": {
+        "back": "Retour au studio",
+        "heading": "Créer une nouvelle chasse"
+      },
+      "edit": {
+        "back": "Retour au studio",
+        "heading": "Modifier la chasse",
+        "notFound": "Chasse introuvable."
+      }
+    },
+    "steps": {
+      "basics": "Base",
+      "steps": "Étapes",
+      "review": "Revue"
+    },
+    "basics": {
+      "title": "Informations de base",
+      "fields": {
+        "title": "Title",
+        "description": "Description",
+        "coverImage": "Image de couverture",
+        "coverImageDescription": "Téléversez une image pour la carte et la page détail.",
+        "difficulty": "Difficulty",
+        "durationMin": "Durée (min)",
+        "status": "Status",
+        "partnerId": "ID partenaire"
+      }
+    },
+    "stepEditor": {
+      "stepTitle": "Étape {number}",
+      "aria": {
+        "moveUp": "Monter l’étape",
+        "moveDown": "Descendre l’étape"
+      },
+      "fields": {
+        "type": "Type",
+        "title": "Title",
+        "points": "Points",
+        "description": "Description",
+        "answer": "Answer"
+      },
+      "answerPlaceholder": "Indice, code, solution, payload QR ou valeur de vérification",
+      "answerHint": "Valeur de vérification optionnelle pour tous les types d’étapes.",
+      "addStep": "Ajouter une étape"
+    },
+    "location": {
+      "heading": "Emplacement",
+      "address": "Adresse",
+      "addressPlaceholder": "ex. 1 rue de Rivoli, Paris",
+      "lookup": "Rechercher",
+      "lookingUp": "Recherche…",
+      "hint": "Saisissez une adresse pour obtenir les coordonnées, ou affinez en cliquant sur la carte.",
+      "toasts": {
+        "enterAddress": "Saisissez d’abord une adresse",
+        "found": "Emplacement trouvé",
+        "lookupFailed": "Échec de la recherche d’adresse",
+        "geocodeFailed": "Impossible de rechercher l’adresse"
+      }
+    },
+    "photoCapture": {
+      "heading": "Capturer sur votre téléphone",
+      "description": "Ouvrez Lootopia Mobile, scannez le QR code et prenez la photo de référence sur place. Elle apparaîtra ici automatiquement.",
+      "referencePhoto": {
+        "label": "Photo de référence",
+        "description": "Prenez une photo sur place ou téléversez une image de référence à reproduire."
+      },
+      "actions": {
+        "starting": "Démarrage…",
+        "usePhoneCamera": "Utiliser l’appareil photo du téléphone",
+        "cancelCapture": "Annuler la capture",
+        "startNewCapture": "Nouvelle capture"
+      },
+      "status": {
+        "waiting": "En attente de la photo de votre téléphone…",
+        "received": "Photo reçue de votre téléphone."
+      },
+      "qr": {
+        "alt": "QR code pour ouvrir la capture mobile",
+        "expoHint": "Lien Expo Go (scannez avec l’appareil photo) :",
+        "signInHint": "Connectez-vous sur mobile avec le même compte partenaire, puis scannez ce QR ou ouvrez :"
+      },
+      "errors": {
+        "startFailed": "Impossible de démarrer la capture mobile",
+        "refreshFailed": "Impossible d’actualiser la session de capture",
+        "sessionExpired": "Session expirée — reconnectez-vous sur le web et relancez une capture."
+      },
+      "captureRedirect": {
+        "invalidTitle": "Lien de capture invalide",
+        "invalidMessage": "Lancez une nouvelle capture depuis l’assistant web.",
+        "expoTitle": "Ouvrir dans Expo Go",
+        "expoMessage": "Ouvrez d’abord Lootopia Mobile dans Expo Go (même tunnel), puis appuyez ci-dessous. Connectez-vous avec votre compte partenaire avant de prendre la photo.",
+        "openCapture": "Ouvrir la capture dans Lootopia Mobile"
+      }
+    },
+    "arPreview": {
+      "message": "Aperçu AR — les joueurs découvriront ce trésor à l’emplacement indiqué dans l’app mobile."
+    },
+    "review": {
+      "title": "Revue et publication",
+      "badges": {
+        "steps": "{count} étapes",
+        "totalPoints": "{totalPoints} points au total"
+      },
+      "stepLine": "{number}. {title} ({stepType}) · {points} pts",
+      "referencePhotoAttached": "Photo de référence jointe",
+      "answer": "Réponse : {answer}",
+      "referencePhotoAlt": "Photo de référence"
+    },
+    "navigation": {
+      "back": "Retour",
+      "next": "Suivant",
+      "createHunt": "Créer la chasse",
+      "saveChanges": "Enregistrer les modifications"
+    },
+    "toasts": {
+      "created": "Chasse créée !",
+      "updated": "Chasse mise à jour !",
+      "saveFailed": "Échec de l’enregistrement",
+      "fixFields": "Corrigez les champs surlignés",
+      "completeSteps": "Complétez toutes les étapes de la chasse"
+    }
+  },
+  "editor": {
+    "note": "Mobile partner hunt editor (distinct from web wizard)"
+  },
+  "imagePicker": {
+    "defaultLabel": "Image",
+    "emptyWithCamera": "Prenez une photo ou téléversez depuis votre appareil",
+    "emptyUpload": "Téléversez une image depuis votre appareil",
+    "uploading": "Téléversement…",
+    "processing": "Traitement…",
+    "takePhoto": "Prendre une photo",
+    "uploadImage": "Téléverser une image",
+    "selectedAlt": "Référence sélectionnée",
+    "preview": {
+      "unavailable": "Aperçu indisponible",
+      "loading": "Chargement de l’aperçu…"
+    },
+    "toasts": {
+      "uploaded": "Image téléversée",
+      "uploadFailed": "Échec du téléversement"
+    }
+  },
+  "ar": {
+    "permission": {
+      "title": "AR mobile",
+      "body": "Autorisez la caméra pour activer l’expérience AR de la chasse.",
+      "button": "Autoriser la caméra"
+    },
+    "kicker": "AR EXPERIENCE",
+    "title": "Indice en réalité augmentée",
+    "live": {
+      "huntPaused": "Chasse suspendue",
+      "stepPaused": "Étape suspendue",
+      "pausedByOrganizer": "⛔ {scope} par l’organisateur",
+      "redirect": "📍 Étape déplacée par l’organisateur{note}"
+    },
+    "clues": {
+      "photoLocked": "Indice photo à moins de {meters} m",
+      "audioButton": "🔊 Indice audio"
+    },
+    "status": {
+      "distance": "Position : {distance} m du point",
+      "geoUnavailable": "Géolocalisation indisponible"
+    },
+    "helperDefault": "Approche-toi du point — ou scanne le QR code de l’étape avec la caméra.",
+    "validateButton": {
+      "validated": "Étape validée ✓",
+      "ready": "Valider l’étape",
+      "blocked": "Validation bloquée"
+    },
+    "messages": {
+      "stepSuspended": "⛔ Étape suspendue par l’organisateur — réessaie plus tard.",
+      "tooFar": "Tu dois être à proximité du point (ou scanner son QR code) avant de valider.",
+      "validatedChest": "Étape validée — le coffre est à toi !",
+      "qrRecognizedGuardian": "QR code reconnu — mais un gardien protège le coffre !",
+      "qrValidated": "QR code reconnu — étape validée !",
+      "qrUnknown": "QR code inconnu pour cette étape.",
+      "guardianDefeated": "Gardien vaincu — étape validée, le coffre est à toi !",
+      "pointsEarned": "+{points} pts",
+      "huntCompleted": "Chasse terminée !",
+      "mustBeNear": "Tu dois être à proximité du point (ou scanner son QR code) avant de valider.",
+      "stepValidatedChest": "Étape validée — le coffre est à toi !",
+      "qrRecognizedValidated": "QR code reconnu — étape validée !"
+    },
+    "answerInput": {
+      "riddlePlaceholder": "Réponse",
+      "cluePlaceholder": "Indice / code"
+    },
+    "permissionTitle": "AR mobile",
+    "permissionText": "Autorise la caméra pour activer l’expérience AR de la chasse.",
+    "allowCamera": "Autoriser la caméra",
+    "huntSuspendedBanner": "Chasse suspendue",
+    "stepSuspendedBanner": "Étape suspendue",
+    "stepRedirected": "📍 Étape déplacée par l’organisateur{note}",
+    "photoClueLocked": "Indice photo à moins de {meters} m",
+    "audioHint": "🔊 Indice audio",
+    "positionFromPoint": "Position : {distance} m du point",
+    "geoUnavailable": "Géolocalisation indisponible",
+    "defaultHelper": "Approche-toi du point — ou scanne le QR code de l’étape avec la caméra.",
+    "stepValidated": "Étape validée ✓",
+    "validateStep": "Valider l’étape",
+    "validationBlocked": "Validation bloquée"
+  },
+  "combat": {
+    "title": "Combat du gardien",
+    "hp": {
+      "guardian": "Gardien",
+      "you": "Toi"
+    },
+    "messages": {
+      "intro": "Un gardien protège le coffre !",
+      "hit": "Touché ! Le gardien chancelle…",
+      "miss": "Raté ! Le gardien contre-attaque.",
+      "guardianWins": "Le gardien t’a repoussé…",
+      "playerWins": "Gardien vaincu ! Le coffre est à toi.",
+      "retryIntro": "Le gardien se redresse — à toi de jouer !",
+      "missed": "Raté ! Le gardien contre-attaque.",
+      "repelled": "Le gardien t’a repoussé…",
+      "won": "Gardien vaincu ! Le coffre est à toi.",
+      "retry": "Le gardien se redresse — à toi de jouer !"
+    },
+    "buttons": {
+      "strike": "⚔️ Frapper !",
+      "flee": "Fuir le combat",
+      "openChest": "Ouvrir le coffre 🪙",
+      "retry": "Réessayer",
+      "giveUp": "Abandonner"
+    },
+    "guardianLabel": "Gardien",
+    "youLabel": "Toi",
+    "strike": "⚔️ Frapper !",
+    "flee": "Fuir le combat",
+    "openChest": "Ouvrir le coffre 🪙",
+    "giveUp": "Abandonner"
+  },
+  "stepAnswer": {
+    "defaultPlaceholder": "Réponse",
+    "validated": "Validé ✓",
+    "errorIncorrect": "Réponse incorrecte"
+  },
+  "stepPhoto": {
+    "takePhoto": "Prendre une photo",
+    "retake": "Reprendre",
+    "send": "Envoyer",
+    "capture": "Capturer",
+    "validated": "Étape validée ✓",
+    "errors": {
+      "cameraDenied": "Permission caméra refusée.",
+      "captureFailed": "Capture échouée",
+      "notRecognized": "Photo non reconnue"
+    }
+  },
+  "capture": {
+    "loginRequired": "Connexion requise",
+    "invalidLink": "Lien invalide",
+    "overlay": {
+      "title": "Photo de référence",
+      "hintCapture": "Cadre l’indice sur place, puis prends la photo.",
+      "hintReview": "Vérifie la photo puis envoie-la à l’assistant web."
+    },
+    "errors": {
+      "cameraDenied": "Permission caméra refusée.",
+      "captureFailed": "Échec de la capture, réessaie.",
+      "uploadFailed": "Envoi échoué.",
+      "wrongAccount": "Connecte-toi avec le même compte partenaire que sur le web.",
+      "sessionExpired": "Session expirée — relance la capture depuis l’assistant web."
+    },
+    "captureFailed": "Échec de la capture, réessaie.",
+    "uploadFailed": "Envoi échoué.",
+    "wrongAccount": "Connecte-toi avec le même compte partenaire que sur le web.",
+    "sessionExpired": "Session expirée — relance la capture depuis l’assistant web.",
+    "loginRequiredText": "Connecte-toi avec ton compte partenaire pour envoyer la photo de référence.",
+    "scanQrHint": "Scanne le QR code depuis l’assistant web.",
+    "referencePhoto": "Photo de référence",
+    "reviewHint": "Vérifie la photo puis envoie-la à l’assistant web.",
+    "frameHint": "Cadre l’indice sur place, puis prends la photo."
+  },
+  "title": "Chasses",
+  "empty": "Aucune chasse",
+  "notFound": "Chasse introuvable",
+  "stepNotFound": "Étape introuvable",
+  "missingCoordinates": "Coordonnées manquantes",
+  "startFailed": "Impossible de démarrer",
+  "inProgressBadge": "En cours",
+  "stepsMeta": "{count} étapes · {duration} min",
+  "inProgress": {
+    "title": "En cours",
+    "empty": "Aucune chasse en cours",
+    "browseCta": "Voir les chasses",
+    "suspendedByOrganizer": "⛔ Suspendue par l’organisateur",
+    "playerPaused": "En pause",
+    "stepProgress": "Étape {current}/{total}",
+    "completed": " · Terminée 🎉",
+    "resumeButton": "▶ Reprendre",
+    "pauseButton": "⏸ Pause",
+    "abandon": "Abandonner la chasse"
+  },
+  "field": {
+    "organizersOnly": "Réservé aux organisateurs",
+    "title": "Terrain",
+    "myHunts": "Mes chasses",
+    "newHuntHere": "Nouvelle chasse ici",
+    "noHunts": "Aucune chasse",
+    "stepsCount": "{count} étapes",
+    "participants": "{count} participants",
+    "showSteps": "Étapes ▼",
+    "hideSteps": "Masquer ▲",
+    "cancelRedirect": "Annuler",
+    "redirectHere": "Rediriger ici",
+    "cells": "Cellules",
+    "points": "Points",
+    "noData": "Aucune donnée",
+    "clear": "Effacer"
+  },
+  "audioHint": {
+    "startFailed": "Impossible de démarrer l'enregistrement.",
+    "recordFailed": "Échec de l'enregistrement.",
+    "stop": "■ Stop",
+    "rerecord": "🎙 Réenregistrer l'indice audio",
+    "record10s": "🎙 Indice audio 10 s",
+    "listen": "▶ Écouter"
+  },
+  "photoClue": {
+    "tooFar": "Approche-toi à moins de 15 m du point (tu es à {distance}).",
+    "secretPhoto": "📷 Photo secrète",
+    "retakeSecretPhoto": "📷 Reprendre la photo secrète"
+  },
+  "photoReference": {
+    "required": "Photo de référence requise"
+  },
+  "stepInput": {
+    "takePhoto": "Prendre une photo",
+    "stepValidated": "Étape validée ✓",
+    "photoNotRecognized": "Photo non reconnue",
+    "wrongAnswer": "Réponse incorrecte"
+  },
+  "map": {
+    "zoneTitle": "Zone de chasse",
+    "zoneDescription": "Point de départ ou zone de référence",
+    "title": "Carte de chasse",
+    "positionShown": "Ta position réelle est affichée sur la carte.",
+    "activatingGps": "Activation de la géolocalisation en cours."
+  }
+}

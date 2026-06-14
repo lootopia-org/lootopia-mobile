@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import MapView, { Circle, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -21,11 +22,7 @@ import { colors, darkMapStyle, glassCard, glassStrongCard, radii } from '@/src/t
 
 type Section = 'creation' | 'liveops' | 'heatmap';
 
-const SECTIONS: Array<{ key: Section; label: string }> = [
-  { key: 'creation', label: 'Création' },
-  { key: 'liveops', label: 'Live ops' },
-  { key: 'heatmap', label: 'Heatmap' },
-];
+const SECTION_KEYS: Section[] = ['creation', 'liveops', 'heatmap'];
 
 const HEATMAP_FALLBACK_CENTER: GeoPoint = { latitude: 37.8044, longitude: -122.2712 };
 
@@ -40,6 +37,7 @@ const getCurrentPoint = async (): Promise<GeoPoint | null> => {
 
 export default function FieldScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation(['hunts', 'common']);
   const { user } = useAuth();
   const [section, setSection] = useState<Section>('creation');
 
@@ -49,7 +47,7 @@ export default function FieldScreen() {
     return (
       <View style={[styles.container, styles.blockedContainer, { paddingTop: insets.top + 16 }]}>
         <View style={styles.blockedCard}>
-          <Text style={styles.blockedTitle}>Réservé aux organisateurs</Text>
+          <Text style={styles.blockedTitle}>{t('common:organizerOnly.fieldTab')}</Text>
         </View>
       </View>
     );
@@ -60,10 +58,10 @@ export default function FieldScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32, paddingHorizontal: 16 }}
     >
-      <Text style={styles.header}>Terrain</Text>
+      <Text style={styles.header}>{t('partner:field.header')}</Text>
 
       <View style={styles.segments}>
-        {SECTIONS.map(({ key, label }) => {
+        {SECTION_KEYS.map((key) => {
           const active = section === key;
           return (
             <Pressable
@@ -71,7 +69,9 @@ export default function FieldScreen() {
               style={[styles.segment, active && styles.segmentActive]}
               onPress={() => setSection(key)}
             >
-              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                {t(`partner:field.segments.${key}`)}
+              </Text>
             </Pressable>
           );
         })}
@@ -86,6 +86,7 @@ export default function FieldScreen() {
 
 function CreationSection() {
   const router = useRouter();
+  const { t } = useTranslation(['hunts', 'common']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,12 +96,12 @@ function CreationSection() {
     try {
       const point = await getCurrentPoint();
       if (!point) {
-        setError('Permission localisation refusée.');
+        setError(t('partner:field.creation.errors.locationDenied'));
         return;
       }
       router.push(`/partner/hunts/new?lat=${point.latitude}&lng=${point.longitude}`);
     } catch {
-      setError('Position GPS indisponible.');
+      setError(t('partner:field.creation.errors.gpsUnavailable'));
     } finally {
       setLoading(false);
     }
@@ -109,13 +110,13 @@ function CreationSection() {
   return (
     <View style={styles.creation}>
       <Pressable style={styles.primaryButton} onPress={() => router.push('/partner/hunts')}>
-        <Text style={styles.primaryButtonText}>Mes chasses</Text>
+        <Text style={styles.primaryButtonText}>{t('partner:field.creation.myHunts')}</Text>
       </Pressable>
       <Pressable style={styles.secondaryButton} onPress={() => void startHere()} disabled={loading}>
         {loading ? (
           <ActivityIndicator color={colors.teal} size="small" />
         ) : (
-          <Text style={styles.secondaryButtonText}>Nouvelle chasse ici</Text>
+          <Text style={styles.secondaryButtonText}>{t('partner:field.creation.newHuntHere')}</Text>
         )}
       </Pressable>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -124,6 +125,7 @@ function CreationSection() {
 }
 
 function LiveOpsSection() {
+  const { t } = useTranslation(['hunts', 'common']);
   const { user } = useAuth();
   const { setStepPaused, setStepRedirect, clearStepRedirect, getStepOverride, syncFromServer } =
     useLiveOps();
@@ -167,7 +169,7 @@ function LiveOpsSection() {
           : await chaseApi.pauseChase(chase.id);
       setChases((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch (err) {
-      setPauseError(err instanceof Error ? err.message : 'Modification impossible.');
+      setPauseError(err instanceof Error ? err.message : t('partner:field.liveops.errors.modifyFailed'));
     } finally {
       setPausingChaseId(null);
     }
@@ -179,12 +181,12 @@ function LiveOpsSection() {
     try {
       const point = await getCurrentPoint();
       if (!point) {
-        setRedirectError('Permission localisation refusée.');
+        setRedirectError(t('partner:field.liveops.errors.locationDenied'));
         return;
       }
       await setStepRedirect(huntId, stepId, point);
     } catch {
-      setRedirectError('Position GPS indisponible.');
+      setRedirectError(t('partner:field.liveops.errors.gpsUnavailable'));
     } finally {
       setRedirectingStepId(null);
     }
@@ -195,7 +197,7 @@ function LiveOpsSection() {
       {loading ? <ActivityIndicator color={colors.teal} style={{ marginTop: 24 }} /> : null}
       {!loading && chases.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>Aucune chasse</Text>
+          <Text style={styles.emptyText}>{t('partner:field.liveops.empty')}</Text>
         </View>
       ) : null}
 
@@ -213,12 +215,16 @@ function LiveOpsSection() {
               </Text>
               {paused ? (
                 <View style={[styles.badge, styles.badgePaused]}>
-                  <Text style={[styles.badgeText, styles.badgeTextPaused]}>En pause</Text>
+                  <Text style={[styles.badgeText, styles.badgeTextPaused]}>{t('partner:field.liveops.huntPause.badge')}</Text>
                 </View>
               ) : null}
             </View>
             <Text style={styles.cardMeta}>
-              {chase.steps.length} étape{chase.steps.length > 1 ? 's' : ''} · {chase.participants} participants
+              {t('partner:field.liveops.meta', {
+                stepCount: chase.steps.length,
+                suffix: chase.steps.length > 1 ? 's' : '',
+                participants: chase.participants,
+              })}
             </Text>
 
             <Pressable
@@ -230,13 +236,15 @@ function LiveOpsSection() {
                 <ActivityIndicator color={paused ? colors.teal : colors.danger} size="small" />
               ) : (
                 <Text style={[styles.pauseHuntText, paused && styles.pauseHuntTextActive]}>
-                  {paused ? 'Reprendre' : 'Suspendre'}
+                  {paused ? t('partner:field.liveops.huntPause.resume') : t('partner:field.liveops.huntPause.suspend')}
                 </Text>
               )}
             </Pressable>
 
             <Pressable onPress={() => setExpandedChaseId(expanded ? null : chase.id)}>
-              <Text style={styles.expandSteps}>{expanded ? 'Masquer ▲' : 'Étapes ▼'}</Text>
+              <Text style={styles.expandSteps}>
+                {expanded ? t('partner:field.liveops.expandSteps.hide') : t('partner:field.liveops.expandSteps.show')}
+              </Text>
             </Pressable>
 
             {expanded
@@ -266,7 +274,9 @@ function LiveOpsSection() {
                           onPress={() => void setStepPaused(chase.id, step.id, !stepPaused)}
                         >
                           <Text style={[styles.smallActionText, stepPaused && styles.smallActionTextPaused]}>
-                            {stepPaused ? 'Reprendre' : 'Suspendre'}
+                            {stepPaused
+                              ? t('partner:field.liveops.stepActions.resume')
+                              : t('partner:field.liveops.stepActions.suspend')}
                           </Text>
                         </Pressable>
                         {redirected ? (
@@ -274,7 +284,7 @@ function LiveOpsSection() {
                             style={styles.smallAction}
                             onPress={() => void clearStepRedirect(chase.id, step.id)}
                           >
-                            <Text style={styles.smallActionTextTeal}>Annuler</Text>
+                            <Text style={styles.smallActionTextTeal}>{t('partner:field.liveops.stepActions.cancelRedirect')}</Text>
                           </Pressable>
                         ) : (
                           <Pressable
@@ -285,7 +295,7 @@ function LiveOpsSection() {
                             {redirectingStepId === step.id ? (
                               <ActivityIndicator size="small" color={colors.teal} />
                             ) : (
-                              <Text style={styles.smallActionTextTeal}>Rediriger ici</Text>
+                              <Text style={styles.smallActionTextTeal}>{t('partner:field.liveops.stepActions.redirectHere')}</Text>
                             )}
                           </Pressable>
                         )}
@@ -303,6 +313,7 @@ function LiveOpsSection() {
 }
 
 function HeatmapSection() {
+  const { t } = useTranslation(['hunts', 'common']);
   const [cells, setCells] = useState<HeatCell[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -353,23 +364,23 @@ function HeatmapSection() {
       <View style={styles.heatStatsRow}>
         <View style={styles.heatStat}>
           <Text style={styles.heatStatValue}>{cells.length}</Text>
-          <Text style={styles.heatStatLabel}>Cellules</Text>
+          <Text style={styles.heatStatLabel}>{t('partner:field.heatmap.stats.cells')}</Text>
         </View>
         <View style={styles.heatStat}>
           <Text style={[styles.heatStatValue, { color: colors.gold }]}>{totalPoints}</Text>
-          <Text style={styles.heatStatLabel}>Points</Text>
+          <Text style={styles.heatStatLabel}>{t('partner:field.heatmap.stats.points')}</Text>
         </View>
       </View>
 
       {loading ? <ActivityIndicator color={colors.teal} style={{ marginTop: 12 }} /> : null}
       {!loading && cells.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>Aucune donnée</Text>
+          <Text style={styles.emptyText}>{t('partner:field.heatmap.empty')}</Text>
         </View>
       ) : null}
 
       <Pressable style={styles.clearButton} onPress={() => void handleClear()}>
-        <Text style={styles.clearButtonText}>Effacer</Text>
+        <Text style={styles.clearButtonText}>{t('partner:field.heatmap.clear')}</Text>
       </Pressable>
     </View>
   );

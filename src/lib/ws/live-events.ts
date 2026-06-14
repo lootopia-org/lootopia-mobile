@@ -16,9 +16,9 @@ export type HuntPausedNotification = {
   message: string;
 };
 
-export function getWsUrl(): string {
+export function getWsUrl(token: string): string {
   const wsBase = API_BASE_URL.replace(/^http/, 'ws');
-  return `${wsBase}/ws`;
+  return `${wsBase}/ws?token=${encodeURIComponent(token)}`;
 }
 
 export function isLiveEvent(data: unknown): data is LiveEvent {
@@ -50,25 +50,22 @@ export function isHuntEvent(data: LiveEvent): boolean {
   return data.topic === 'hunts' || data.eventType.startsWith('hunts.');
 }
 
+export function isProfileUpdatedEvent(data: LiveEvent): boolean {
+  return data.topic === 'profiles' && data.eventType === 'profiles.updated';
+}
+
 export type LiveEventsConnection = {
   close: () => void;
   updateLocation: (latitude: number, longitude: number) => void;
 };
 
-type WebSocketWithHeaders = new (
-  url: string,
-  protocols?: string | string[],
-  options?: { headers?: Record<string, string> }
-) => WebSocket;
-
 export function connectLiveEvents(
   token: string,
   onEvent: (event: LiveEvent) => void,
-  onClose?: () => void
+  onClose?: () => void,
+  onOpen?: () => void
 ): LiveEventsConnection {
-  const ws = new (WebSocket as unknown as WebSocketWithHeaders)(getWsUrl(), undefined, {
-    headers: { Cookie: `session=${token}` },
-  });
+  const ws = new WebSocket(getWsUrl(token));
 
   let closed = false;
 
@@ -79,6 +76,7 @@ export function connectLiveEvents(
         topics: ['hunts', 'profiles', 'hunt_steps', 'notifications'],
       })
     );
+    onOpen?.();
   };
 
   const updateLocation = (latitude: number, longitude: number) => {
@@ -94,7 +92,7 @@ export function connectLiveEvents(
     );
   };
 
-  ws.onmessage = (message) => {
+  ws.onmessage = (message: MessageEvent) => {
     try {
       const data = JSON.parse(String(message.data)) as unknown;
       if (isLiveEvent(data)) {

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Text, TextInput, Pressable, StyleSheet, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/src/state/AuthContext';
 import { colors, glassCard, radii } from '@/src/theme';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const { t } = useTranslation(['auth', 'common']);
   const { forgotPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
@@ -17,11 +19,8 @@ export default function ForgotPasswordScreen() {
       setIsLoading(true);
       setError(null);
       await forgotPassword(email.trim());
-      // L'API répond toujours par un message générique (pas d'énumération de
-      // comptes) : on affiche donc la même confirmation quoi qu'il arrive.
       setSent(true);
     } catch {
-      // Même en cas d'erreur réseau on n'expose rien sur l'existence du compte.
       setSent(true);
     } finally {
       setIsLoading(false);
@@ -30,42 +29,37 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Mot de passe oublié</Text>
+      <Text style={styles.title}>{t('auth:forgotPassword.title')}</Text>
 
       {sent ? (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>📬 C’est envoyé</Text>
-          <Text style={styles.cardText}>
-            Si un compte existe pour cette adresse, un lien de réinitialisation à usage unique vient d’être envoyé.
-            Ouvre-le depuis ton téléphone, ou saisis le code reçu :
-          </Text>
+          <Text style={styles.cardTitle}>{t('auth:forgotPassword.sentTitle')}</Text>
+          <Text style={styles.cardText}>{t('auth:forgotPassword.sentText')}</Text>
           <Pressable style={styles.button} onPress={() => router.push('/(auth)/reset-password')}>
-            <Text style={styles.buttonText}>J’ai reçu mon code</Text>
+            <Text style={styles.buttonText}>{t('auth:forgotPassword.receivedCode')}</Text>
           </Pressable>
         </View>
       ) : (
         <>
-          <Text style={styles.subtitle}>
-            Indique ton email : on t’enverra un lien de réinitialisation à usage unique.
-          </Text>
+          <Text style={styles.subtitle}>{t('auth:forgotPassword.subtitle')}</Text>
           <TextInput
             style={styles.input}
             value={email}
             onChangeText={setEmail}
-            placeholder="Email"
+            placeholder={t('common:placeholders.email')}
             placeholderTextColor={colors.textFaint}
             autoCapitalize="none"
             keyboardType="email-address"
           />
           {error && <Text style={styles.error}>{error}</Text>}
           <Pressable style={[styles.button, isLoading && styles.buttonDisabled]} onPress={handleSubmit} disabled={isLoading || !email.trim()}>
-            <Text style={styles.buttonText}>Envoyer le lien</Text>
+            <Text style={styles.buttonText}>{t('auth:forgotPassword.sendLink')}</Text>
           </Pressable>
         </>
       )}
 
       <Link href="/(auth)/login" style={styles.link}>
-        Retour à la connexion
+        {t('auth:forgotPassword.backToLogin')}
       </Link>
     </View>
   );

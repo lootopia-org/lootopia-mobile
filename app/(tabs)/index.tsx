@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT, type MapType } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { PlayerCharacter } from '@/src/components/PlayerCharacter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
@@ -14,6 +15,7 @@ import { colors, darkMapStyle, glassStrongCard, radii } from '@/src/theme';
 import { bearingDegrees, formatDistance, haversineDistanceMeters, smoothPosition, type GeoPoint } from '@/src/lib/geo';
 import { getFps } from '@/src/lib/perf';
 import { recordBreadcrumb } from '@/src/lib/heatmap';
+import { huntJoinErrorMessage } from '@/src/lib/hunt-join-errors';
 import { usePlayerProfile } from '@/src/hooks/usePlayerProfile';
 
 // Région initiale de la carte tant que le GPS n'a pas fourni de position.
@@ -31,19 +33,15 @@ type GpsProfile = keyof typeof GPS_PROFILES;
 const NEAR_ENTER_METERS = 400;
 const NEAR_EXIT_METERS = 600;
 
-// Styles de carte personnalisables par le joueur (persistés).
-const MAP_STYLES = [
-  { id: 'dark', label: 'Sombre' },
-  { id: 'light', label: 'Clair' },
-  { id: 'satellite', label: 'Satellite' },
-] as const;
-type MapStyleId = (typeof MAP_STYLES)[number]['id'];
+const MAP_STYLE_IDS = ['dark', 'light', 'satellite'] as const;
+type MapStyleId = (typeof MAP_STYLE_IDS)[number];
 const MAP_STYLE_KEY = 'lootopia-mobile-map-style';
 
 export default function MapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { avatarModel, acceptHunt, isAccepted } = useHunts();
+  const { t } = useTranslation(['common', 'hunts']);
+  const { avatarModel, acceptHunt, abandonHunt, isAccepted, canPlayHunts, refreshFromServer } = useHunts();
   // Niveau/points réels du joueur (GET /profile).
   const { level, points } = usePlayerProfile();
 
@@ -99,9 +97,12 @@ export default function MapScreen() {
 
   // Chargement des chasses (API ; liste vide en cas d'erreur réseau).
   const huntsRef = useRef<Chase[]>([]);
-  useEffect(() => {
+  const loadHunts = useCallback(() => {
     chaseApi.getChases().then(setHunts).catch(() => setHunts([]));
   }, []);
+  useEffect(() => {
+    loadHunts();
+  }, [loadHunts]);
   useEffect(() => {
     huntsRef.current = hunts;
   }, [hunts]);
@@ -169,6 +170,10 @@ export default function MapScreen() {
   // joueur : le personnage reste au centre, la carte défile (pattern Pokémon GO).
   useFocusEffect(
     useCallback(() => {
+      loadHunts();
+      if (canPlayHunts) {
+        void refreshFromServer();
+      }
       let cancelled = false;
 
       (async () => {
@@ -191,7 +196,7 @@ export default function MapScreen() {
           clearTimeout(walkingTimeout.current);
         }
       };
-    }, [subscribeGps])
+    }, [canPlayHunts, loadHunts, refreshFromServer, subscribeGps])
   );
 
   const huntsWithDistance = useMemo(
@@ -253,10 +258,25 @@ export default function MapScreen() {
   };
 
   const handleAccept = async () => {
-    if (!selectedHunt) {
+    if (!selectedHunt || !canPlayHunts) {
       return;
     }
-    await acceptHunt(selectedHunt.id);
+    try {
+      await acceptHunt(selectedHunt.id);
+    } catch (err) {
+      Alert.alert(t('hunts:shared.errors.joinFailed'), huntJoinErrorMessage(err, t));
+    }
+  };
+
+  const handleLeave = async () => {
+    if (!selectedHunt || !canPlayHunts) {
+      return;
+    }
+    try {
+      await abandonHunt(selectedHunt.id);
+    } catch (err) {
+      Alert.alert(t('hunts:shared.errors.leaveFailed'), huntJoinErrorMessage(err, t));
+    }
   };
 
   const selectedDistance =
@@ -325,14 +345,14 @@ export default function MapScreen() {
       <View style={[styles.mapControls, { bottom: insets.bottom + 18 }]}>
         {stylePickerOpen && (
           <View style={styles.stylePicker}>
-            {MAP_STYLES.map((style) => (
+            {MAP_STYLE_IDS.map((styleId) => (
               <Pressable
-                key={style.id}
-                style={[styles.styleChip, mapStyle === style.id && styles.styleChipActive]}
-                onPress={() => selectMapStyle(style.id)}
+                key={styleId}
+                style={[styles.styleChip, mapStyle === styleId && styles.styleChipActive]}
+                onPress={() => selectMapStyle(styleId)}
               >
-                <Text style={[styles.styleChipText, mapStyle === style.id && styles.styleChipTextActive]}>
-                  {style.label}
+                <Text style={[styles.styleChipText, mapStyle === styleId && styles.styleChipTextActive]}>
+                  {t(`common:map.styles.${styleId}`)}
                 </Text>
               </Pressable>
             ))}
@@ -357,10 +377,10 @@ export default function MapScreen() {
       {/* HUD niveau / points */}
       <View style={[styles.hud, { top: insets.top + 10 }]}>
         <View style={styles.hudPill}>
-          <Text style={styles.hudGold}>⭐ Niv. {level}</Text>
+          <Text style={styles.hudGold}>{t('common:account.levelShort', { level })}</Text>
         </View>
         <View style={styles.hudPill}>
-          <Text style={styles.hudTeal}>{points} pts</Text>
+          <Text style={styles.hudTeal}>{t('common:account.stats.pointsHud', { points })}</Text>
         </View>
         {__DEV__ && (
           <View style={styles.hudPill}>
@@ -371,16 +391,14 @@ export default function MapScreen() {
 
       {permissionDenied && (
         <View style={[styles.banner, { top: insets.top + 56 }]}>
-          <Text style={styles.bannerText}>
-            Localisation refusée — active-la dans les réglages pour voir ta position.
-          </Text>
+          <Text style={styles.bannerText}>{t('common:map.locationDenied')}</Text>
         </View>
       )}
 
       {proximityAlert && (
         <View style={[styles.proximityBanner, { top: insets.top + 56 }]}>
-          <Text style={styles.proximityTitle}>🧰 Chasse à proximité !</Text>
-          <Text style={styles.proximityText}>« {proximityAlert} » est à moins de 250 m.</Text>
+          <Text style={styles.proximityTitle}>{t('common:map.proximity.title')}</Text>
+          <Text style={styles.proximityText}>{t('common:map.proximity.body', { huntTitle: proximityAlert })}</Text>
         </View>
       )}
 
@@ -402,7 +420,7 @@ export default function MapScreen() {
           <View style={styles.sheetGrab} />
           <Text style={styles.sheetTitle}>{selectedHunt.title}</Text>
           <View style={styles.sheetMeta}>
-            <Chip label={selectedHunt.difficulty === 'easy' ? 'Facile' : selectedHunt.difficulty === 'hard' ? 'Difficile' : 'Moyenne'} />
+            <Chip label={t(`hunts:shared.difficultyLabels.${selectedHunt.difficulty}`)} />
             <Chip label={`🏆 ${selectedHunt.steps.reduce((sum, step) => sum + (step.reward ?? 0), 0)} pts`} gold />
             {selectedDistance !== null && <Chip label={`📍 ${formatDistance(selectedDistance)}`} teal />}
           </View>
@@ -410,17 +428,22 @@ export default function MapScreen() {
             {selectedHunt.description}
           </Text>
           {isAccepted(selectedHunt.id) ? (
-            <Pressable
-              style={[styles.cta, styles.ctaAccepted]}
-              onPress={() => router.push(`/chases/${selectedHunt.id}`)}
-            >
-              <Text style={styles.ctaAcceptedText}>En cours ✓ — voir le détail</Text>
+            <View style={styles.sheetActions}>
+              <Pressable
+                style={[styles.cta, styles.ctaAccepted]}
+                onPress={() => router.push(`/chases/${selectedHunt.id}`)}
+              >
+                <Text style={styles.ctaAcceptedText}>{t('common:map.sheet.acceptedCta')}</Text>
+              </Pressable>
+              <Pressable style={[styles.cta, styles.ctaLeave]} onPress={() => void handleLeave()}>
+                <Text style={styles.ctaLeaveText}>{t('hunts:shared.abandon')}</Text>
+              </Pressable>
+            </View>
+          ) : canPlayHunts ? (
+            <Pressable style={styles.cta} onPress={() => void handleAccept()}>
+              <Text style={styles.ctaText}>{t('common:map.sheet.acceptCta')}</Text>
             </Pressable>
-          ) : (
-            <Pressable style={styles.cta} onPress={handleAccept}>
-              <Text style={styles.ctaText}>Accepter la chasse</Text>
-            </Pressable>
-          )}
+          ) : null}
         </Animated.View>
       )}
     </View>
@@ -478,8 +501,11 @@ const styles = StyleSheet.create({
   chip: { borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.glass },
   chipText: { color: colors.foreground, fontSize: 11, fontWeight: '700' },
   sheetDescription: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  sheetActions: { gap: 10 },
   cta: { backgroundColor: colors.gold, borderRadius: radii.md, alignItems: 'center', paddingVertical: 13 },
   ctaText: { color: colors.background, fontWeight: '900', fontSize: 15 },
   ctaAccepted: { backgroundColor: colors.tealSoft, borderColor: colors.teal, borderWidth: 1 },
   ctaAcceptedText: { color: colors.teal, fontWeight: '900', fontSize: 15 },
+  ctaLeave: { backgroundColor: 'transparent', borderColor: colors.danger, borderWidth: 1 },
+  ctaLeaveText: { color: colors.danger, fontWeight: '900', fontSize: 15 },
 });

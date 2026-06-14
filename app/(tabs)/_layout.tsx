@@ -1,12 +1,13 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/src/state/AuthContext';
 import { colors } from '@/src/theme';
 
 export default function TabsLayout() {
+  const { t } = useTranslation('common');
   const { user } = useAuth();
-  // Mode Terrain réservé aux partenaires/admins (mêmes rôles que le web).
   const canAccessField = user?.role === 'partner' || user?.role === 'admin';
 
   return (
@@ -30,28 +31,27 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Carte', tabBarIcon: ({ color, size }) => <Ionicons name="navigate-outline" color={color} size={size} /> }}
+        options={{ title: t('tabs.map'), tabBarIcon: ({ color, size }) => <Ionicons name="navigate-outline" color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="chases"
-        options={{ title: 'Disponibles', tabBarIcon: ({ color, size }) => <Ionicons name="map-outline" color={color} size={size} /> }}
+        options={{ title: t('tabs.available'), tabBarIcon: ({ color, size }) => <Ionicons name="map-outline" color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="in-progress"
-        options={{ title: 'En cours', tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" color={color} size={size} /> }}
+        options={{ title: t('tabs.inProgress'), tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="field"
         options={{
-          title: 'Terrain',
-          // href: null masque l'onglet pour les joueurs (l'écran re-vérifie le rôle).
+          title: t('tabs.field'),
           href: canAccessField ? undefined : null,
           tabBarIcon: ({ color, size }) => <Ionicons name="construct-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="account"
-        options={{ title: 'Profil', tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" color={color} size={size} /> }}
+        options={{ title: t('tabs.profile'), tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" color={color} size={size} /> }}
       />
     </Tabs>
   );

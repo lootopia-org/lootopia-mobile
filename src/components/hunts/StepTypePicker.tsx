@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { HUNT_STEP_TYPE_OPTIONS, type HuntStepType } from '@/src/lib/hunt-types';
+import { useTranslation } from 'react-i18next';
+import { getHuntStepTypeOptions, type HuntStepType } from '@/src/lib/hunt-types';
 import { colors, glassCard, radii } from '@/src/theme';
 
 type Props = {
@@ -9,9 +10,13 @@ type Props = {
 };
 
 export function StepTypePicker({ value, onChange }: Props) {
+  const { i18n } = useTranslation();
+  void i18n.language;
+  const options = getHuntStepTypeOptions();
+
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {HUNT_STEP_TYPE_OPTIONS.map((option) => {
+      {options.map((option) => {
         const active = option.value === value;
         return (
           <Pressable

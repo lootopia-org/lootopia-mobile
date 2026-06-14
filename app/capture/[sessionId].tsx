@@ -9,20 +9,18 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { stepPhotoApi } from '@/src/lib/step-photo-api';
 import { uploadStepImage } from '@/src/lib/upload-api';
+import { mapUploadErrorMessage } from '@/src/lib/upload-errors';
 import { useAuth } from '@/src/state/AuthContext';
 import { colors, glassCard, radii } from '@/src/theme';
 
-/**
- * Deep link `lootopia://capture/{sessionId}` — le partenaire photographie
- * la référence d'une étape photo depuis son téléphone ; l'image apparaît
- * instantanément dans le wizard web via WebSocket.
- */
 export default function CaptureScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation(['hunts', 'common', 'auth']);
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const { isAuthenticated } = useAuth();
   const cameraRef = useRef<CameraView>(null);
@@ -47,7 +45,7 @@ export default function CaptureScreen() {
     setError(null);
     const allowed = await ensureCamera();
     if (!allowed) {
-      setError('Permission caméra refusée.');
+      setError(t('hunts:capture.errors.cameraDenied'));
       return;
     }
     setCapturing(true);
@@ -57,7 +55,7 @@ export default function CaptureScreen() {
         setPreviewUri(photo.uri);
       }
     } catch {
-      setError('Échec de la capture, réessaie.');
+      setError(t('hunts:capture.errors.captureFailed'));
     } finally {
       setCapturing(false);
     }
@@ -78,13 +76,11 @@ export default function CaptureScreen() {
         router.replace('/(tabs)/field');
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Envoi échoué.';
-      if (/forbidden|unauthorized|403|401/i.test(message)) {
-        setError('Connecte-toi avec le même compte partenaire que sur le web.');
-      } else if (/invalid|expired|404/i.test(message)) {
-        setError('Session expirée — relance la capture depuis le wizard web.');
+      const message = err instanceof Error ? err.message : t('hunts:capture.errors.uploadFailed');
+      if (/invalid|expired|404/i.test(message)) {
+        setError(t('hunts:capture.errors.sessionExpired'));
       } else {
-        setError(message);
+        setError(mapUploadErrorMessage(message, t('hunts:capture.errors.wrongAccount')));
       }
     } finally {
       setUploading(false);
@@ -95,12 +91,10 @@ export default function CaptureScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
         <View style={styles.card}>
-          <Text style={styles.title}>Connexion requise</Text>
-          <Text style={styles.subtitle}>
-            Connecte-toi avec ton compte partenaire pour envoyer la photo de référence.
-          </Text>
+          <Text style={styles.title}>{t('hunts:capture.loginRequired')}</Text>
+          <Text style={styles.subtitle}>{t('hunts:capture.loginRequiredText')}</Text>
           <Pressable style={styles.primaryButton} onPress={() => router.replace('/(auth)/login')}>
-            <Text style={styles.primaryButtonText}>Se connecter</Text>
+            <Text style={styles.primaryButtonText}>{t('auth:login.actions.signIn')}</Text>
           </Pressable>
         </View>
       </View>
@@ -111,10 +105,10 @@ export default function CaptureScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
         <View style={styles.card}>
-          <Text style={styles.title}>Lien invalide</Text>
-          <Text style={styles.subtitle}>Scanne le QR code depuis le wizard web.</Text>
+          <Text style={styles.title}>{t('hunts:capture.invalidLink')}</Text>
+          <Text style={styles.subtitle}>{t('hunts:capture.scanQrHint')}</Text>
           <Pressable style={styles.secondaryButton} onPress={() => router.back()}>
-            <Text style={styles.secondaryButtonText}>Fermer</Text>
+            <Text style={styles.secondaryButtonText}>{t('common:close')}</Text>
           </Pressable>
         </View>
       </View>
@@ -130,11 +124,9 @@ export default function CaptureScreen() {
       )}
 
       <View style={[styles.overlay, { paddingBottom: insets.bottom + 16, paddingTop: insets.top + 12 }]}>
-        <Text style={styles.overlayTitle}>Photo de référence</Text>
+        <Text style={styles.overlayTitle}>{t('hunts:capture.overlay.title')}</Text>
         <Text style={styles.overlayHint}>
-          {previewUri
-            ? 'Vérifie la photo puis envoie-la au wizard web.'
-            : 'Cadre l’indice sur place, puis prends la photo.'}
+          {previewUri ? t('hunts:capture.overlay.hintReview') : t('hunts:capture.overlay.hintCapture')}
         </Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -144,7 +136,9 @@ export default function CaptureScreen() {
             onPress={() => (previewUri ? setPreviewUri(null) : router.back())}
             disabled={uploading}
           >
-            <Text style={styles.secondaryButtonText}>{previewUri ? 'Reprendre' : 'Annuler'}</Text>
+            <Text style={styles.secondaryButtonText}>
+              {previewUri ? t('hunts:stepPhoto.retake') : t('common:cancel')}
+            </Text>
           </Pressable>
 
           {previewUri ? (
@@ -152,7 +146,7 @@ export default function CaptureScreen() {
               {uploading ? (
                 <ActivityIndicator color={colors.background} />
               ) : (
-                <Text style={styles.primaryButtonText}>Envoyer</Text>
+                <Text style={styles.primaryButtonText}>{t('common:send')}</Text>
               )}
             </Pressable>
           ) : (
@@ -181,12 +175,6 @@ const styles = StyleSheet.create({
   card: { ...glassCard, padding: 24, gap: 12 },
   title: { color: colors.foreground, fontSize: 20, fontWeight: '900' },
   subtitle: { color: colors.textMuted, lineHeight: 20 },
-  preview: {
-    width: '100%',
-    height: 220,
-    borderRadius: radii.lg,
-    marginTop: 8,
-  },
   overlay: {
     position: 'absolute',
     left: 0,

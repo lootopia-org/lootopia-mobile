@@ -1,3 +1,5 @@
+import i18n from '@/src/i18n';
+
 export const HUNT_STEP_TYPES = [
   'checkpoint',
   'riddle',
@@ -11,17 +13,12 @@ export type HuntStepType = (typeof HUNT_STEP_TYPES)[number];
 
 export const DEFAULT_STEP_POINTS = 10;
 
-export const HUNT_STEP_TYPE_OPTIONS: {
-  value: HuntStepType;
-  label: string;
-}[] = [
-  { value: 'checkpoint', label: 'Checkpoint GPS' },
-  { value: 'riddle', label: 'Énigme' },
-  { value: 'qr_code', label: 'QR code' },
-  { value: 'clue', label: 'Indice' },
-  { value: 'ar', label: 'Trésor AR' },
-  { value: 'photo', label: 'Photo' },
-];
+export function getHuntStepTypeOptions(): { value: HuntStepType; label: string }[] {
+  return HUNT_STEP_TYPES.map((value) => ({
+    value,
+    label: i18n.t(`hunts:stepTypes.${value}`),
+  }));
+}
 
 export type HuntStatus = 'active' | 'draft' | 'archived' | 'paused';
 export type HuntDifficulty = 'easy' | 'medium' | 'hard';
@@ -60,24 +57,9 @@ export function createDefaultStep(order: number, lat?: number, lng?: number): Hu
 }
 
 export function stepTypeLabel(type: HuntStepType): string {
-  return HUNT_STEP_TYPE_OPTIONS.find((opt) => opt.value === type)?.label ?? type;
+  return i18n.t(`hunts:stepTypes.${type}`, { defaultValue: type });
 }
 
 export function stepActionLabel(type: HuntStepType): string {
-  switch (type) {
-    case 'checkpoint':
-      return 'Y aller';
-    case 'riddle':
-      return 'Répondre';
-    case 'qr_code':
-      return 'Scanner';
-    case 'clue':
-      return 'Découvrir';
-    case 'ar':
-      return 'Ouvrir AR';
-    case 'photo':
-      return 'Photographier';
-    default:
-      return 'Commencer';
-  }
+  return i18n.t(`hunts:stepActions.${type}`, { defaultValue: i18n.t('hunts:stepActions.default') });
 }

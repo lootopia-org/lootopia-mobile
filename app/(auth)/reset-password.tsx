@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
 import { Text, TextInput, Pressable, StyleSheet, View } from 'react-native';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/src/state/AuthContext';
 import { colors, glassCard, radii } from '@/src/theme';
 
-/**
- * Réinitialisation du mot de passe. Le token (usage unique, expirant) vient du
- * lien email : soit pré-rempli via deep link `lootopia://reset-password?token=…`,
- * soit collé manuellement. Le succès révoque les sessions existantes (contrat
- * API), donc on renvoie l'utilisateur vers la connexion.
- */
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const { t } = useTranslation(['auth', 'common']);
   const { token: tokenParam } = useLocalSearchParams<{ token?: string }>();
   const { resetPassword } = useAuth();
   const [token, setToken] = useState(tokenParam ?? '');
@@ -22,11 +18,11 @@ export default function ResetPasswordScreen() {
 
   const handleSubmit = async () => {
     if (newPassword.length < 8) {
-      setError('Le mot de passe doit faire au moins 8 caractères.');
+      setError(t('auth:resetPassword.errors.passwordTooShort'));
       return;
     }
     if (newPassword !== confirm) {
-      setError('Les deux mots de passe ne correspondent pas.');
+      setError(t('auth:resetPassword.errors.passwordMismatch'));
       return;
     }
     try {
@@ -35,11 +31,10 @@ export default function ResetPasswordScreen() {
       await resetPassword(token.trim(), newPassword);
       router.replace('/(auth)/login');
     } catch (resetError: any) {
-      // Token invalide/expiré : message clair, le lien est à usage unique.
       setError(
         resetError?.status === 400 || resetError?.status === 401
-          ? 'Lien invalide ou expiré. Redemande un email de réinitialisation.'
-          : 'Réinitialisation impossible. Réessaie plus tard.'
+          ? t('auth:resetPassword.errors.invalidToken')
+          : t('auth:resetPassword.errors.generic')
       );
     } finally {
       setIsLoading(false);
@@ -48,21 +43,19 @@ export default function ResetPasswordScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Nouveau mot de passe</Text>
-      <Text style={styles.subtitle}>
-        Colle le code reçu par email (ou ouvre le lien depuis ce téléphone), puis choisis un nouveau mot de passe.
-      </Text>
+      <Text style={styles.title}>{t('auth:resetPassword.title')}</Text>
+      <Text style={styles.subtitle}>{t('auth:resetPassword.subtitle')}</Text>
 
       <TextInput
         style={styles.input}
         value={token}
         onChangeText={setToken}
-        placeholder="Code de réinitialisation"
+        placeholder={t('auth:resetPassword.tokenPlaceholder')}
         placeholderTextColor={colors.textFaint}
         autoCapitalize="none"
       />
-      <TextInput style={styles.input} value={newPassword} onChangeText={setNewPassword} placeholder="Nouveau mot de passe" placeholderTextColor={colors.textFaint} secureTextEntry />
-      <TextInput style={styles.input} value={confirm} onChangeText={setConfirm} placeholder="Confirme le mot de passe" placeholderTextColor={colors.textFaint} secureTextEntry />
+      <TextInput style={styles.input} value={newPassword} onChangeText={setNewPassword} placeholder={t('auth:resetPassword.newPasswordPlaceholder')} placeholderTextColor={colors.textFaint} secureTextEntry />
+      <TextInput style={styles.input} value={confirm} onChangeText={setConfirm} placeholder={t('auth:resetPassword.confirmPlaceholder')} placeholderTextColor={colors.textFaint} secureTextEntry />
 
       {error && <Text style={styles.error}>{error}</Text>}
 
@@ -71,12 +64,12 @@ export default function ResetPasswordScreen() {
         onPress={handleSubmit}
         disabled={isLoading || !token.trim() || !newPassword}
       >
-        <Text style={styles.buttonText}>Réinitialiser</Text>
+        <Text style={styles.buttonText}>{t('auth:resetPassword.submit')}</Text>
       </Pressable>
-      <Text style={styles.note}>Toutes les sessions existantes seront déconnectées.</Text>
+      <Text style={styles.note}>{t('auth:resetPassword.sessionsNote')}</Text>
 
       <Link href="/(auth)/login" style={styles.link}>
-        Retour à la connexion
+        {t('auth:resetPassword.backToLogin')}
       </Link>
     </View>
   );

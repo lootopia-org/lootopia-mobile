@@ -12,7 +12,19 @@
     "userInterfaceStyle": "light",
     "plugins": [
       "expo-router",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Lootopia uses your camera to capture hunt step photos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Lootopia uses your location to track hunt progress and validate checkpoints."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": false

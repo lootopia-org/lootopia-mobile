@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HuntEditor } from '@/src/components/hunts/HuntEditor';
 import { chaseApi } from '@/src/lib/chase-api';
@@ -12,6 +13,7 @@ import { colors } from '@/src/theme';
 export default function EditHuntScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation('hunts');
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [initial, setInitial] = useState<HuntForm | null>(null);
@@ -24,7 +26,7 @@ export default function EditHuntScreen() {
     chaseApi
       .getChase(id)
       .then((chase) => setInitial(chaseToHuntForm(chase)))
-      .catch(() => setError('Chasse introuvable'));
+      .catch(() => setError(t('partner:hunts.editLoadError')));
   }, [id]);
 
   if (error) {

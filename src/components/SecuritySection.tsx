@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import {
   authApi,
   type TotpEnrollBeginResponse,
@@ -7,17 +8,11 @@ import {
 } from '@/src/lib/auth-api';
 import { useAuth } from '@/src/state/AuthContext';
 import { getTotpStatus, setTotpStatus } from '@/src/lib/totp-status';
+import { getDateLocale } from '@/src/i18n';
 import { colors, glassCard, radii } from '@/src/theme';
 
-/**
- * Section Sécurité du profil — consomme les endpoints authentifiés du contrat :
- * POST /auth/totp/enroll/begin → {secret, otpauthUri}
- * POST /auth/totp/enroll/verify {code}
- * POST /auth/totp/disable {code}
- * GET  /auth/webauthn/credentials
- * (L'ajout d'une passkey reste côté web : WebAuthn n'existe pas dans Expo Go.)
- */
 export function SecuritySection() {
+  const { t, i18n } = useTranslation(['common']);
   const { token } = useAuth();
 
   const [enrollment, setEnrollment] = useState<TotpEnrollBeginResponse | null>(null);
@@ -30,6 +25,8 @@ export function SecuritySection() {
   const [isLoading, setIsLoading] = useState(false);
 
   const realToken = token;
+  void i18n.language;
+  const dateLocale = getDateLocale();
 
   const loadCredentials = useCallback(async () => {
     if (!realToken) {
@@ -37,8 +34,6 @@ export function SecuritySection() {
     }
     try {
       const list = await authApi.listWebauthnCredentials(realToken);
-      // Garde : le backend peut répondre 200 avec un corps vide/null ou une
-      // forme inattendue — on ne garde que les vrais tableaux.
       setCredentials(Array.isArray(list) ? list : []);
     } catch {
       setCredentials(null);
@@ -53,8 +48,8 @@ export function SecuritySection() {
   if (!realToken) {
     return (
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>🔐 Sécurité</Text>
-        <Text style={styles.muted}>Connecte-toi pour gérer la sécurité de ton compte.</Text>
+        <Text style={styles.cardTitle}>{t('common:security.title')}</Text>
+        <Text style={styles.muted}>{t('common:security.loginRequired')}</Text>
       </View>
     );
   }
@@ -66,7 +61,7 @@ export function SecuritySection() {
       setMessage(null);
       await action();
     } catch (apiError: any) {
-      setError(apiError?.message || 'Opération impossible.');
+      setError(apiError?.message || t('common:errors.operationFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +80,7 @@ export function SecuritySection() {
       setTotpCode('');
       setTotpEnabled(true);
       await setTotpStatus(true);
-      setMessage('TOTP activé sur ton compte ✓');
+      setMessage(t('common:security.totp.successEnabled'));
     });
 
   const handleDisable = () =>
@@ -95,16 +90,15 @@ export function SecuritySection() {
       setTotpCode('');
       setTotpEnabled(false);
       await setTotpStatus(false);
-      setMessage('TOTP désactivé.');
+      setMessage(t('common:security.totp.successDisabled'));
     });
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>🔐 Sécurité</Text>
+      <Text style={styles.cardTitle}>{t('common:security.title')}</Text>
 
-      {/* --- TOTP --- */}
       <View style={styles.totpHeader}>
-        <Text style={styles.sectionLabel}>Double authentification (TOTP)</Text>
+        <Text style={styles.sectionLabel}>{t('common:security.totp.sectionLabel')}</Text>
         <View
           style={[
             styles.statusPill,
@@ -119,16 +113,18 @@ export function SecuritySection() {
               totpEnabled === false && { color: colors.danger },
             ]}
           >
-            {totpEnabled === true ? '● Activé' : totpEnabled === false ? '○ Désactivé' : '? Inconnu'}
+            {totpEnabled === true
+              ? t('common:security.totp.status.enabled')
+              : totpEnabled === false
+                ? t('common:security.totp.status.disabled')
+                : t('common:security.totp.status.unknown')}
           </Text>
         </View>
       </View>
 
       {enrollment ? (
         <View style={styles.enrollBox}>
-          <Text style={styles.muted}>
-            Ajoute ce secret dans ton app d’authentification (Google Authenticator, Authy…) puis saisis le code généré :
-          </Text>
+          <Text style={styles.muted}>{t('common:security.totp.enrollInstructions')}</Text>
           <Text selectable style={styles.secret}>
             {enrollment.secret}
           </Text>
@@ -136,43 +132,43 @@ export function SecuritySection() {
             style={styles.input}
             value={totpCode}
             onChangeText={setTotpCode}
-            placeholder="Code à 6 chiffres"
+            placeholder={t('common:security.totp.placeholder')}
             placeholderTextColor={colors.textFaint}
             keyboardType="number-pad"
           />
           <View style={styles.row}>
             <Pressable style={styles.primaryButton} onPress={handleVerifyEnroll} disabled={isLoading || totpCode.trim().length < 6}>
-              <Text style={styles.primaryButtonText}>Confirmer</Text>
+              <Text style={styles.primaryButtonText}>{t('common:confirm')}</Text>
             </Pressable>
             <Pressable style={styles.ghostButton} onPress={() => setEnrollment(null)}>
-              <Text style={styles.ghostButtonText}>Annuler</Text>
+              <Text style={styles.ghostButtonText}>{t('common:cancel')}</Text>
             </Pressable>
           </View>
         </View>
       ) : disableMode ? (
         <View style={styles.enrollBox}>
-          <Text style={styles.muted}>Saisis un code TOTP valide pour confirmer la désactivation :</Text>
+          <Text style={styles.muted}>{t('common:security.totp.disableInstructions')}</Text>
           <TextInput
             style={styles.input}
             value={totpCode}
             onChangeText={setTotpCode}
-            placeholder="Code à 6 chiffres"
+            placeholder={t('common:security.totp.placeholder')}
             placeholderTextColor={colors.textFaint}
             keyboardType="number-pad"
           />
           <View style={styles.row}>
             <Pressable style={[styles.primaryButton, styles.dangerButton]} onPress={handleDisable} disabled={isLoading || totpCode.trim().length < 6}>
-              <Text style={styles.dangerButtonText}>Désactiver</Text>
+              <Text style={styles.dangerButtonText}>{t('common:security.totp.disable')}</Text>
             </Pressable>
             <Pressable style={styles.ghostButton} onPress={() => setDisableMode(false)}>
-              <Text style={styles.ghostButtonText}>Annuler</Text>
+              <Text style={styles.ghostButtonText}>{t('common:cancel')}</Text>
             </Pressable>
           </View>
         </View>
       ) : (
         <View style={styles.row}>
           <Pressable style={styles.primaryButton} onPress={handleBeginEnroll} disabled={isLoading}>
-            <Text style={styles.primaryButtonText}>Activer TOTP</Text>
+            <Text style={styles.primaryButtonText}>{t('common:security.totp.activate')}</Text>
           </Pressable>
           <Pressable
             style={styles.ghostButton}
@@ -181,24 +177,29 @@ export function SecuritySection() {
               setTotpCode('');
             }}
           >
-            <Text style={styles.ghostButtonText}>Désactiver…</Text>
+            <Text style={styles.ghostButtonText}>{t('common:security.totp.disableEllipsis')}</Text>
           </Pressable>
         </View>
       )}
 
-      {/* --- Passkeys --- */}
-      <Text style={styles.sectionLabel}>Passkeys enregistrées</Text>
+      <Text style={styles.sectionLabel}>{t('common:security.passkeys.sectionLabel')}</Text>
       {!Array.isArray(credentials) ? (
-        <Text style={styles.muted}>Liste indisponible.</Text>
+        <Text style={styles.muted}>{t('common:security.passkeys.listUnavailable')}</Text>
       ) : credentials.length === 0 ? (
-        <Text style={styles.muted}>Aucune passkey. Ajoute-en une depuis le site web (Paramètres → Sécurité).</Text>
+        <Text style={styles.muted}>{t('common:security.passkeys.empty')}</Text>
       ) : (
         credentials.map((credential) => (
           <View key={credential.id} style={styles.credentialRow}>
-            <Text style={styles.credentialName}>🔑 {credential.name || 'Passkey'}</Text>
+            <Text style={styles.credentialName}>🔑 {credential.name || t('common:security.passkeys.defaultName')}</Text>
             <Text style={styles.credentialMeta}>
-              créée le {new Date(credential.createdAt).toLocaleDateString('fr-FR')}
-              {credential.lastUsedAt ? ` · utilisée le ${new Date(credential.lastUsedAt).toLocaleDateString('fr-FR')}` : ''}
+              {t('common:security.passkeys.metaCreated', {
+                date: new Date(credential.createdAt).toLocaleDateString(dateLocale),
+              })}
+              {credential.lastUsedAt
+                ? t('common:security.passkeys.metaLastUsed', {
+                    date: new Date(credential.lastUsedAt).toLocaleDateString(dateLocale),
+                  })
+                : ''}
             </Text>
           </View>
         ))

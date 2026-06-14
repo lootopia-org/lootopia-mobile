@@ -146,17 +146,38 @@ export const chaseApi = {
   },
 
   joinHunt: async (huntId: string): Promise<void> => {
-    await apiRequest<void>('/hunt/join', {
-      method: 'POST',
-      body: JSON.stringify({ huntId }),
-    });
+    try {
+      await apiRequest<void>('/hunt/join', {
+        method: 'POST',
+        body: JSON.stringify({ huntId }),
+      });
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      if (status === 409) {
+        return;
+      }
+      throw error;
+    }
   },
 
   leaveHunt: async (huntId: string): Promise<void> => {
-    await apiRequest<void>('/hunt/leave', {
-      method: 'POST',
-      body: JSON.stringify({ huntId }),
-    });
+    try {
+      await apiRequest<void>('/hunt/leave', {
+        method: 'POST',
+        body: JSON.stringify({ huntId }),
+      });
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      if (status === 409) {
+        return;
+      }
+      throw error;
+    }
+  },
+
+  getJoinedHuntIds: async (): Promise<string[]> => {
+    const hunts = await chaseApi.getJoinedHunts();
+    return hunts.map((hunt) => hunt.id);
   },
 
   getJoinedHunts: async (): Promise<Chase[]> => {
@@ -164,11 +185,18 @@ export const chaseApi = {
     return normalizeChasesResponse(response);
   },
 
+  getCompletedStepIds: async (huntId: string): Promise<string[]> => {
+    const response = await apiRequest<Array<{ id?: string }>>(`/hunt/step/completed/${huntId}`);
+    return response.map((step) => step.id).filter((id): id is string => Boolean(id));
+  },
+
   getProgress: async (chaseId: string): Promise<UserProgress | null> =>
     localProgressStore.get(chaseId) ?? null,
 
-  startChase: async (chaseId: string): Promise<UserProgress> => {
-    await chaseApi.joinHunt(chaseId);
+  startChase: async (chaseId: string, alreadyJoined = false): Promise<UserProgress> => {
+    if (!alreadyJoined) {
+      await chaseApi.joinHunt(chaseId);
+    }
     const chase = await chaseApi.getChase(chaseId);
     const progress = buildLocalProgress(chase);
     localProgressStore.set(chaseId, progress);

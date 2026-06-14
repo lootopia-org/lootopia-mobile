@@ -7,21 +7,17 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/src/state/AuthContext';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
 import { colors, glassCard, radii } from '@/src/theme';
 
-const STATUS_LABELS: Record<string, string> = {
-  active: 'Active',
-  draft: 'Brouillon',
-  paused: 'En pause',
-};
-
 export default function PartnerHuntsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation(['partner', 'common']);
   const { user } = useAuth();
   const [hunts, setHunts] = useState<Chase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,12 +36,18 @@ export default function PartnerHuntsScreen() {
 
   useEffect(load, [load]);
 
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
   const allowed = user?.role === 'partner' || user?.role === 'admin';
 
   if (!allowed) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <Text style={styles.blocked}>Accès réservé aux organisateurs</Text>
+        <Text style={styles.blocked}>{t('common:organizerOnly.partnerHunts')}</Text>
       </View>
     );
   }
@@ -54,9 +56,9 @@ export default function PartnerHuntsScreen() {
     <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()}>
-          <Text style={styles.back}>← Retour</Text>
+          <Text style={styles.back}>{t('common:back')}</Text>
         </Pressable>
-        <Text style={styles.title}>Mes chasses</Text>
+        <Text style={styles.title}>{t('partner:hunts.header')}</Text>
         <Pressable onPress={() => router.push('/partner/hunts/new')}>
           <Text style={styles.add}>+</Text>
         </Pressable>
@@ -71,7 +73,7 @@ export default function PartnerHuntsScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>Aucune chasse</Text>
+              <Text style={styles.emptyText}>{t('partner:hunts.empty')}</Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -80,11 +82,14 @@ export default function PartnerHuntsScreen() {
               onPress={() => router.push(`/partner/hunts/${item.id}/edit`)}
             >
               <Text style={styles.cardTitle} numberOfLines={1}>
-                {item.title || 'Sans titre'}
+                {item.title || t('partner:hunts.untitled')}
               </Text>
               <Text style={styles.cardMeta}>
-                {item.steps.length} étape{item.steps.length > 1 ? 's' : ''} ·{' '}
-                {STATUS_LABELS[item.status] ?? item.status}
+                {t('partner:hunts.cardMeta', {
+                  stepCount: item.steps.length,
+                  suffix: item.steps.length > 1 ? 's' : '',
+                  status: t(`partner:hunts.status.${item.status}`),
+                })}
               </Text>
             </Pressable>
           )}

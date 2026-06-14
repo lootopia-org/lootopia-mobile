@@ -7,12 +7,8 @@ import {
   useAudioPlayer,
   useAudioRecorder,
 } from 'expo-audio';
+import { useTranslation } from 'react-i18next';
 import { colors, radii } from '@/src/theme';
-
-/**
- * Indice audio d'une étape de brouillon Terrain : enregistrement micro
- * de 10 s max (arrêt auto), réécoute possible une fois capturé.
- */
 
 const MAX_DURATION_SECONDS = 10;
 
@@ -22,6 +18,7 @@ type Props = {
 };
 
 export function AudioHintRecorder({ audioHintUri, onRecorded }: Props) {
+  const { t } = useTranslation(['partner', 'common']);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const player = useAudioPlayer(null);
   const [recording, setRecording] = useState(false);
@@ -49,7 +46,7 @@ export function AudioHintRecorder({ audioHintUri, onRecorded }: Props) {
     try {
       const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
-        setError('Permission micro refusée.');
+        setError(t('partner:field.audioHintRecorder.errors.micDenied'));
         return;
       }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
@@ -62,12 +59,11 @@ export function AudioHintRecorder({ audioHintUri, onRecorded }: Props) {
         () => setElapsed((value) => Math.min(value + 1, MAX_DURATION_SECONDS)),
         1000
       );
-      // Arrêt automatique à 10 s.
       stopTimeout.current = setTimeout(() => {
         void stopRecording();
       }, MAX_DURATION_SECONDS * 1000);
     } catch {
-      setError("Impossible de démarrer l'enregistrement.");
+      setError(t('partner:field.audioHintRecorder.errors.startFailed'));
     }
   };
 
@@ -84,7 +80,7 @@ export function AudioHintRecorder({ audioHintUri, onRecorded }: Props) {
         onRecorded(recorder.uri);
       }
     } catch {
-      setError("Échec de l'enregistrement.");
+      setError(t('partner:field.audioHintRecorder.errors.recordFailed'));
     } finally {
       setRecording(false);
     }
@@ -104,21 +100,23 @@ export function AudioHintRecorder({ audioHintUri, onRecorded }: Props) {
       <View style={styles.row}>
         {recording ? (
           <Pressable style={[styles.button, styles.stopButton]} onPress={() => void stopRecording()}>
-            <Text style={styles.stopText}>■ Stop</Text>
+            <Text style={styles.stopText}>{t('partner:field.audioHintRecorder.stop')}</Text>
           </Pressable>
         ) : (
           <Pressable style={styles.button} onPress={() => void startRecording()}>
             <Text style={styles.buttonText}>
-              🎙 {audioHintUri ? "Réenregistrer l'indice audio" : 'Indice audio 10 s'}
+              {audioHintUri ? t('partner:field.audioHintRecorder.rerecord') : t('partner:field.audioHintRecorder.recordNew')}
             </Text>
           </Pressable>
         )}
         {recording ? (
-          <Text style={styles.recIndicator}>● REC 0:{String(elapsed).padStart(2, '0')}</Text>
+          <Text style={styles.recIndicator}>
+            {t('partner:field.audioHintRecorder.recIndicator', { seconds: String(elapsed).padStart(2, '0') })}
+          </Text>
         ) : null}
         {!recording && audioHintUri ? (
           <Pressable style={styles.playButton} onPress={playHint}>
-            <Text style={styles.playText}>▶ Écouter</Text>
+            <Text style={styles.playText}>{t('partner:field.audioHintRecorder.listen')}</Text>
           </Pressable>
         ) : null}
       </View>

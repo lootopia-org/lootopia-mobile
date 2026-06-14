@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { useTranslation } from 'react-i18next';
 import { chaseApi } from '@/src/lib/chase-api';
 import {
   createDefaultStep,
@@ -33,48 +34,38 @@ type Props = {
 };
 
 const DIFFICULTIES: HuntDifficulty[] = ['easy', 'medium', 'hard'];
-const DIFFICULTY_LABELS: Record<HuntDifficulty, string> = {
-  easy: 'Facile',
-  medium: 'Moyenne',
-  hard: 'Difficile',
-};
 const STATUSES: HuntStatus[] = ['draft', 'active'];
-const STATUS_LABELS: Record<HuntStatus, string> = {
-  draft: 'Brouillon',
-  active: 'Active',
-  archived: 'Archivée',
-  paused: 'En pause',
-};
 
-function validateForm(form: HuntForm): string | null {
+function validateForm(form: HuntForm, t: (key: string, options?: Record<string, unknown>) => string): string | null {
   if (form.title.trim().length < 3) {
-    return 'Titre : 3 caractères minimum';
+    return t('validation:huntTitleMin');
   }
   if (form.description.trim().length < 10) {
-    return 'Description : 10 caractères minimum';
+    return t('validation:huntDescriptionMin');
   }
   if (form.steps.length === 0) {
-    return 'Ajoute au moins une étape';
+    return t('validation:huntStepsRequired');
   }
   for (let i = 0; i < form.steps.length; i++) {
     const step = form.steps[i];
     if (!step.title.trim()) {
-      return `Étape ${i + 1} : titre requis`;
+      return t('validation:stepTitleRequired', { index: i + 1 });
     }
     if (!step.description.trim()) {
-      return `Étape ${i + 1} : description requise`;
+      return t('validation:stepDescriptionRequired', { index: i + 1 });
     }
     if (!step.latitude.trim() || !step.longitude.trim()) {
-      return `Étape ${i + 1} : coordonnées requises`;
+      return t('validation:stepCoordinatesRequired', { index: i + 1 });
     }
     if (step.type === 'photo' && !step.answer?.trim()) {
-      return `Étape ${i + 1} : photo de référence requise`;
+      return t('validation:stepPhotoReferenceRequired', { index: i + 1 });
     }
   }
   return null;
 }
 
 export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel }: Props) {
+  const { t } = useTranslation(['partner', 'common', 'validation']);
   const [form, setForm] = useState<HuntForm>(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +130,7 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!permission.granted) {
-        setError('Permission localisation refusée.');
+        setError(t('common:permissions.locationDenied'));
         return;
       }
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -148,12 +139,12 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
         longitude: String(position.coords.longitude),
       });
     } catch {
-      setError('Position GPS indisponible.');
+      setError(t('common:permissions.gpsUnavailable'));
     }
   };
 
   const handleSave = async () => {
-    const validationError = validateForm(form);
+    const validationError = validateForm(form, t);
     if (validationError) {
       setError(validationError);
       return;
@@ -169,7 +160,7 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
         onSaved(huntId);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Enregistrement échoué');
+      setError(err instanceof Error ? err.message : t('common:errors.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -179,10 +170,10 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
     if (!huntId) {
       return;
     }
-    Alert.alert('Supprimer', 'Cette chasse sera supprimée définitivement.', [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert(t('partner:editor.deleteConfirmTitle'), t('partner:editor.deleteConfirmMessage'), [
+      { text: t('common:cancel'), style: 'cancel' },
       {
-        text: 'Supprimer',
+        text: t('common:delete'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -191,7 +182,7 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
               await chaseApi.deleteChase(huntId);
               onCancel();
             } catch (err) {
-              setError(err instanceof Error ? err.message : 'Suppression échouée');
+              setError(err instanceof Error ? err.message : t('common:errors.deleteFailed'));
             } finally {
               setSaving(false);
             }
@@ -205,31 +196,31 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <Pressable onPress={onCancel}>
-          <Text style={styles.back}>← Retour</Text>
+          <Text style={styles.back}>{t('common:back')}</Text>
         </Pressable>
-        <Text style={styles.title}>{mode === 'create' ? 'Nouvelle chasse' : 'Modifier'}</Text>
+        <Text style={styles.title}>{mode === 'create' ? t('partner:editor.newHunt') : t('partner:editor.editHunt')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Chasse</Text>
+        <Text style={styles.sectionTitle}>{t('partner:editor.huntSection')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Titre"
+          placeholder={t('common:placeholders.title')}
           placeholderTextColor={colors.textFaint}
           value={form.title}
           onChangeText={(title) => updateForm({ title })}
         />
         <TextInput
           style={[styles.input, styles.textArea]}
-          placeholder="Description"
+          placeholder={t('common:placeholders.description')}
           placeholderTextColor={colors.textFaint}
           value={form.description}
           onChangeText={(description) => updateForm({ description })}
           multiline
         />
         <View style={styles.row}>
-          <Text style={styles.label}>Difficulté</Text>
+          <Text style={styles.label}>{t('partner:editor.difficulty')}</Text>
           <View style={styles.chips}>
             {DIFFICULTIES.map((d) => (
               <Pressable
@@ -238,14 +229,14 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
                 onPress={() => updateForm({ difficulty: d })}
               >
                 <Text style={[styles.chipText, form.difficulty === d && styles.chipTextActive]}>
-                  {DIFFICULTY_LABELS[d]}
+                  {t(`common:difficulty.${d}`)}
                 </Text>
               </Pressable>
             ))}
           </View>
         </View>
         <View style={styles.row}>
-          <Text style={styles.label}>Durée (min)</Text>
+          <Text style={styles.label}>{t('partner:editor.durationMinutes')}</Text>
           <TextInput
             style={[styles.input, styles.numberInput]}
             keyboardType="number-pad"
@@ -254,7 +245,7 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
           />
         </View>
         <View style={styles.row}>
-          <Text style={styles.label}>Statut</Text>
+          <Text style={styles.label}>{t('partner:editor.status')}</Text>
           <View style={styles.chips}>
             {STATUSES.map((s) => (
               <Pressable
@@ -263,7 +254,7 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
                 onPress={() => updateForm({ status: s })}
               >
                 <Text style={[styles.chipText, form.status === s && styles.chipTextActive]}>
-                  {STATUS_LABELS[s]}
+                  {t(`common:status.${s}`)}
                 </Text>
               </Pressable>
             ))}
@@ -273,9 +264,9 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Étapes ({form.steps.length})</Text>
+          <Text style={styles.sectionTitle}>{t('partner:editor.stepsSection', { count: form.steps.length })}</Text>
           <Pressable style={styles.addButton} onPress={() => void addStep()}>
-            <Text style={styles.addButtonText}>+ Ajouter</Text>
+            <Text style={styles.addButtonText}>{t('partner:editor.addStep')}</Text>
           </Pressable>
         </View>
 
@@ -307,14 +298,14 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
 
             <TextInput
               style={styles.input}
-              placeholder="Titre"
+              placeholder={t('common:placeholders.title')}
               placeholderTextColor={colors.textFaint}
               value={step.title}
               onChangeText={(title) => updateStep(index, { title })}
             />
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Description"
+              placeholder={t('common:placeholders.description')}
               placeholderTextColor={colors.textFaint}
               value={step.description}
               onChangeText={(description) => updateStep(index, { description })}
@@ -324,7 +315,7 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
             <View style={styles.coordRow}>
               <TextInput
                 style={[styles.input, styles.coordInput]}
-                placeholder="Latitude"
+                placeholder={t('common:placeholders.latitude')}
                 placeholderTextColor={colors.textFaint}
                 value={step.latitude}
                 onChangeText={(latitude) => updateStep(index, { latitude })}
@@ -332,7 +323,7 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
               />
               <TextInput
                 style={[styles.input, styles.coordInput]}
-                placeholder="Longitude"
+                placeholder={t('common:placeholders.longitude')}
                 placeholderTextColor={colors.textFaint}
                 value={step.longitude}
                 onChangeText={(longitude) => updateStep(index, { longitude })}
@@ -340,11 +331,11 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
               />
             </View>
             <Pressable style={styles.gpsButton} onPress={() => void useCurrentLocation(index)}>
-              <Text style={styles.gpsButtonText}>📍 Position actuelle</Text>
+              <Text style={styles.gpsButtonText}>{t('partner:editor.currentLocation')}</Text>
             </Pressable>
 
             <View style={styles.row}>
-              <Text style={styles.label}>Points</Text>
+              <Text style={styles.label}>{t('partner:editor.points')}</Text>
               <TextInput
                 style={[styles.input, styles.numberInput]}
                 keyboardType="number-pad"
@@ -358,10 +349,10 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
                 style={styles.input}
                 placeholder={
                   step.type === 'riddle'
-                    ? 'Réponse'
+                    ? t('common:placeholders.answer')
                     : step.type === 'qr_code'
-                      ? 'Contenu QR'
-                      : 'Indice / code'
+                      ? t('common:placeholders.qrContent')
+                      : t('common:placeholders.hintCode')
                 }
                 placeholderTextColor={colors.textFaint}
                 value={step.answer ?? ''}
@@ -385,13 +376,13 @@ export function HuntEditor({ mode, huntId, initial, partnerId, onSaved, onCancel
         {saving ? (
           <ActivityIndicator color={colors.background} />
         ) : (
-          <Text style={styles.saveButtonText}>{mode === 'create' ? 'Créer' : 'Enregistrer'}</Text>
+          <Text style={styles.saveButtonText}>{mode === 'create' ? t('common:create') : t('common:save')}</Text>
         )}
       </Pressable>
 
       {mode === 'edit' && huntId ? (
         <Pressable style={styles.deleteButton} onPress={handleDelete} disabled={saving}>
-          <Text style={styles.deleteButtonText}>Supprimer la chasse</Text>
+          <Text style={styles.deleteButtonText}>{t('partner:editor.deleteHunt')}</Text>
         </Pressable>
       ) : null}
     </ScrollView>

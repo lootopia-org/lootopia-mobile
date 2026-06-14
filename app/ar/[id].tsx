@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ARExperience } from '@/src/components/ARExperience';
 import { StepAnswerInput } from '@/src/components/hunts/StepAnswerInput';
 import { StepPhotoCapture } from '@/src/components/hunts/StepPhotoCapture';
+import { useFinishHuntStep } from '@/src/hooks/useFinishHuntStep';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
 import type { HuntStepType } from '@/src/lib/hunt-types';
-import { profileApi } from '@/src/lib/profile-api';
-import { useAuth } from '@/src/state/AuthContext';
 import { useHunts } from '@/src/state/HuntsContext';
 import { useLiveOps } from '@/src/state/LiveOpsContext';
 import { useLiveEventsContext } from '@/src/state/LiveEventsContext';
@@ -18,13 +18,15 @@ import { colors, radii } from '@/src/theme';
 export default function ARScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation(['hunts', 'common']);
   const { id, stepId } = useLocalSearchParams<{ id: string; stepId?: string }>();
   const { getStepOverride, syncFromServer } = useLiveOps();
   const { subscribeHuntEvents } = useLiveEventsContext();
-  const { token } = useAuth();
-  const { acceptedHunts, completeStep: completeStepLocally } = useHunts();
+  const finishHuntStep = useFinishHuntStep();
+  const { acceptedHunts, refreshFromServer, canPlayHunts } = useHunts();
   const [chase, setChase] = useState<Chase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export default function ARScreen() {
         setIsLoading(true);
         setChase(await chaseApi.getChase(id));
       } catch {
-        setError('Chasse introuvable');
+        setError(t('hunts:shared.errors.notFound'));
       } finally {
         setIsLoading(false);
       }
@@ -52,27 +54,49 @@ export default function ARScreen() {
         void syncFromServer(id);
       }
     });
-  }, [id, subscribeHuntEvents, syncFromServer]);
+  }, [id, subscribeHuntEvents, syncFromServer, t]);
 
   const step = chase?.steps.find((item) => item.id === stepId) ?? chase?.steps[0];
   const stepType: HuntStepType = step?.type ?? 'checkpoint';
+  const stepCompleted = Boolean(
+    id && step && (acceptedHunts[id]?.completedStepIds ?? []).includes(step.id)
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (canPlayHunts) {
+        void refreshFromServer();
+      }
+    }, [canPlayHunts, refreshFromServer])
+  );
 
   const finishStep = async (answer?: string) => {
-    if (!chase || !step) {
+    if (!chase || !step || isSubmitting) {
       return;
     }
-    await chaseApi.completeStep(chase.id, step.id, answer);
-    await completeStepLocally(chase.id, step.id);
 
-    const alreadyDone = acceptedHunts[chase.id]?.completedStepIds ?? [];
-    const doneAfter = new Set([...alreadyDone, step.id]);
-    const isHuntComplete = chase.steps.every((item) => doneAfter.has(item.id));
-    if (isHuntComplete && token) {
-      try {
-        await profileApi.completeHunt(token, chase.id);
-      } catch {
-        // best-effort
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const { pointsEarned, huntCompleted } = await finishHuntStep(chase, step, answer);
+
+      if (pointsEarned > 0) {
+        Alert.alert(
+          t('hunts:ar.messages.pointsEarned', { points: pointsEarned }),
+          huntCompleted ? t('hunts:ar.messages.huntCompleted') : undefined
+        );
+      } else if (huntCompleted) {
+        Alert.alert(t('hunts:ar.messages.huntCompleted'));
       }
+
+      router.back();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('common:errors.saveFailed');
+      setError(message);
+      Alert.alert(t('common:errors.operationFailed'), message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -87,7 +111,19 @@ export default function ARScreen() {
   if (!chase || !step) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notFoundText}>{error ?? 'Étape introuvable'}</Text>
+        <Text style={styles.notFoundText}>{error ?? t('hunts:shared.errors.stepNotFound')}</Text>
+      </View>
+    );
+  }
+
+  if (stepCompleted) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.completedTitle}>{t('hunts:participants.status.completed')}</Text>
+        <Text style={styles.completedSubtitle}>{step.title}</Text>
+        <Pressable style={styles.backLink} onPress={() => router.back()}>
+          <Text style={styles.backLinkText}>{t('common:back')}</Text>
+        </Pressable>
       </View>
     );
   }
@@ -95,7 +131,7 @@ export default function ARScreen() {
   if (!step.location) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notFoundText}>Coordonnées manquantes</Text>
+        <Text style={styles.notFoundText}>{t('hunts:shared.errors.missingCoordinates')}</Text>
       </View>
     );
   }
@@ -113,7 +149,7 @@ export default function ARScreen() {
         <StepAnswerInput
           description={step.description}
           onSubmit={(answer) => finishStep(answer)}
-          placeholder={stepType === 'riddle' ? 'Réponse' : 'Indice / code'}
+          placeholder={stepType === 'riddle' ? t('hunts:ar.answerInput.riddlePlaceholder') : t('hunts:ar.answerInput.cluePlaceholder')}
         />
       );
     }
@@ -144,6 +180,12 @@ export default function ARScreen() {
     <View style={styles.container}>
       {renderStepContent()}
 
+      {isSubmitting && (
+        <View style={styles.submittingOverlay}>
+          <ActivityIndicator color={colors.gold} size="large" />
+        </View>
+      )}
+
       <View style={[styles.topBar, { top: insets.top + 10 }]} pointerEvents="box-none">
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={colors.foreground} />
@@ -155,6 +197,11 @@ export default function ARScreen() {
           <Text style={styles.stepText} numberOfLines={1}>
             {step.title}
           </Text>
+          {(step.points ?? 0) > 0 && (
+            <Text style={styles.pointsText}>
+              {t('hunts:shared.points.short', { points: step.points ?? 0 })}
+            </Text>
+          )}
         </View>
       </View>
     </View>
@@ -185,6 +232,17 @@ const styles = StyleSheet.create({
   },
   titleText: { color: colors.foreground, fontWeight: '900', fontSize: 13 },
   stepText: { color: colors.gold, fontWeight: '700', fontSize: 11, marginTop: 1 },
+  pointsText: { color: colors.teal, fontWeight: '800', fontSize: 10, marginTop: 2 },
+  submittingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11,15,26,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   notFoundText: { color: colors.textMuted, fontWeight: '700' },
+  completedTitle: { color: colors.teal, fontWeight: '900', fontSize: 22 },
+  completedSubtitle: { color: colors.foreground, fontWeight: '700', fontSize: 16, marginTop: 8, textAlign: 'center', paddingHorizontal: 24 },
+  backLink: { marginTop: 20, paddingHorizontal: 16, paddingVertical: 10 },
+  backLinkText: { color: colors.gold, fontWeight: '800', fontSize: 14 },
 });

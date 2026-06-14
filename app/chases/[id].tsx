@@ -1,6 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, ScrollView, Text, View, Pressable, StyleSheet, ImageBackground } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { ActivityIndicator, Alert, ScrollView, Text, View, Pressable, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { StoredImageBackground } from '@/src/components/StoredImage';
+import { huntJoinErrorMessage } from '@/src/lib/hunt-join-errors';
 import { useHunts } from '@/src/state/HuntsContext';
 import { ChaseMap } from '@/src/components/ChaseMap';
 import { chaseApi, type Chase, type UserProgress } from '@/src/lib/chase-api';
@@ -10,10 +13,13 @@ import { colors, glassCard, radii } from '@/src/theme';
 export default function ChaseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { isAccepted, acceptHunt } = useHunts();
+  const { t } = useTranslation(['hunts', 'common']);
+  const { isAccepted, acceptHunt, abandonHunt, canPlayHunts, refreshFromServer, acceptedHunts } =
+    useHunts();
   const [chase, setChase] = useState<Chase | null>(null);
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,32 +38,74 @@ export default function ChaseDetailScreen() {
         setChase(nextChase);
         setProgress(nextProgress);
       } catch {
-        setError('Chasse introuvable');
+        setError(t('hunts:shared.errors.notFound'));
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [id]);
+  }, [id, t]);
 
-  const activeStep = useMemo(() => {
-    if (!progress || !chase) {
-      return null;
+  useEffect(() => {
+    if (canPlayHunts) {
+      void refreshFromServer();
     }
-    return chase.steps[Math.max(0, progress.currentStep - 1)] ?? chase.steps[0];
-  }, [chase, progress]);
+  }, [canPlayHunts, id, refreshFromServer]);
 
-  const handleLaunch = async () => {
-    if (!chase) return;
+  useFocusEffect(
+    useCallback(() => {
+      if (canPlayHunts) {
+        void refreshFromServer();
+      }
+    }, [canPlayHunts, refreshFromServer])
+  );
+
+  const handleContinue = async () => {
+    if (!chase || !isAccepted(chase.id)) {
+      return;
+    }
 
     try {
-      if (!isAccepted(chase.id)) {
+      setError(null);
+      const nextProgress = progress ?? (await chaseApi.startChase(chase.id, true));
+      if (!progress) {
+        setProgress(nextProgress);
+      }
+
+      const completedIds =
+        acceptedHunts[chase.id]?.completedStepIds ??
+        (await chaseApi.getCompletedStepIds(chase.id).catch((): string[] => []));
+      const currentStep =
+        chase.steps.find((step) => !completedIds.includes(step.id)) ?? chase.steps[0];
+
+      router.push(`/ar/${chase.id}?stepId=${currentStep?.id ?? chase.steps[0]?.id}`);
+    } catch (err) {
+      setError(huntJoinErrorMessage(err, t));
+    }
+  };
+
+  const handleJoinLeave = async () => {
+    if (!chase || !canPlayHunts) {
+      return;
+    }
+
+    const joined = isAccepted(chase.id);
+    setActionLoading(true);
+    setError(null);
+
+    try {
+      if (joined) {
+        await abandonHunt(chase.id);
+        setProgress(null);
+      } else {
         await acceptHunt(chase.id);
       }
-      const nextProgress = progress ?? (await chaseApi.startChase(chase.id));
-      setProgress(nextProgress);
-      router.push(`/ar/${chase.id}?stepId=${activeStep?.id ?? chase.steps[0]?.id}`);
-    } catch {
-      setError('Impossible de démarrer');
+    } catch (err) {
+      Alert.alert(
+        joined ? t('hunts:shared.errors.leaveFailed') : t('hunts:shared.errors.joinFailed'),
+        huntJoinErrorMessage(err, t)
+      );
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -72,22 +120,24 @@ export default function ChaseDetailScreen() {
   if (!chase) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notFoundText}>Chasse introuvable</Text>
+        <Text style={styles.notFoundText}>{t('hunts:shared.errors.notFound')}</Text>
       </View>
     );
   }
 
   const accepted = isAccepted(chase.id);
+  const completedCount = acceptedHunts[chase.id]?.completedStepIds.length ?? 0;
+  const difficultyLabel = t(`hunts:shared.difficultyLabels.${chase.difficulty}`);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
       {chase.image ? (
-        <ImageBackground source={{ uri: chase.image }} style={styles.hero} imageStyle={styles.heroImage}>
+        <StoredImageBackground storedUrl={chase.image} style={styles.hero} imageStyle={styles.heroImage}>
           <View style={styles.heroOverlay}>
             <Text style={styles.title}>{chase.title}</Text>
             <Text style={styles.description}>{chase.description}</Text>
           </View>
-        </ImageBackground>
+        </StoredImageBackground>
       ) : (
         <View style={styles.heroPlain}>
           <Text style={styles.title}>{chase.title}</Text>
@@ -97,19 +147,19 @@ export default function ChaseDetailScreen() {
 
       {accepted && (
         <View style={styles.acceptedBanner}>
-          <Text style={styles.acceptedBannerText}>En cours</Text>
+          <Text style={styles.acceptedBannerText}>{t('hunts:detail.bannerInProgress')}</Text>
         </View>
       )}
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Détail</Text>
-        <Text style={styles.meta}>Difficulté : {chase.difficulty}</Text>
-        <Text style={styles.meta}>Durée : {chase.estimatedDuration} min</Text>
-        <Text style={styles.meta}>Organisateur : {chase.partner.name}</Text>
+        <Text style={styles.sectionTitle}>{t('hunts:shared.sections.detail')}</Text>
+        <Text style={styles.meta}>{t('hunts:shared.meta.detailDifficulty', { difficulty: difficultyLabel })}</Text>
+        <Text style={styles.meta}>{t('hunts:shared.meta.detailDuration', { minutes: chase.estimatedDuration })}</Text>
+        <Text style={styles.meta}>{t('hunts:shared.meta.detailOrganizer', { name: chase.partner.name })}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Carte</Text>
+        <Text style={styles.sectionTitle}>{t('hunts:shared.sections.map')}</Text>
         <ChaseMap
           center={chase.location}
           markers={chase.steps
@@ -124,38 +174,74 @@ export default function ChaseDetailScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Étapes</Text>
+        <Text style={styles.sectionTitle}>{t('hunts:shared.sections.steps')}</Text>
         <Text style={styles.meta}>
-          {progress?.currentStep ?? 1} / {chase.steps.length}
+          {t('hunts:shared.meta.progressCounter', {
+            current: Math.min(completedCount + 1, chase.steps.length),
+            total: chase.steps.length,
+          })}
         </Text>
         {chase.steps.map((step, index) => {
           const type = (step.type ?? 'checkpoint') as HuntStepType;
+          const stepCompleted = (acceptedHunts[chase.id]?.completedStepIds ?? []).includes(step.id);
           return (
-            <View key={step.id} style={styles.step}>
+            <View key={step.id} style={[styles.step, stepCompleted && styles.stepCompleted]}>
               <View style={styles.stepHeader}>
-                <Text style={styles.stepTitle}>
+                <Text style={[styles.stepTitle, stepCompleted && styles.stepTitleCompleted]}>
                   {index + 1}. {step.title}
                 </Text>
-                <View style={styles.typeBadge}>
-                  <Text style={styles.typeBadgeText}>{stepTypeLabel(type)}</Text>
+                <View style={styles.stepBadges}>
+                  {stepCompleted && (
+                    <View style={styles.completedBadge}>
+                      <Text style={styles.completedBadgeText}>{t('hunts:participants.status.completed')}</Text>
+                    </View>
+                  )}
+                  <View style={styles.typeBadge}>
+                    <Text style={styles.typeBadgeText}>{stepTypeLabel(type)}</Text>
+                  </View>
                 </View>
               </View>
               <Text style={styles.stepText}>{step.description}</Text>
-              <Pressable
-                style={styles.secondaryButton}
-                onPress={() => router.push(`/ar/${chase.id}?stepId=${step.id}`)}
-              >
-                <Text style={styles.secondaryButtonText}>{stepActionLabel(type)}</Text>
-              </Pressable>
+              {accepted && !stepCompleted && (
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => router.push(`/ar/${chase.id}?stepId=${step.id}`)}
+                >
+                  <Text style={styles.secondaryButtonText}>{stepActionLabel(type)}</Text>
+                </Pressable>
+              )}
             </View>
           );
         })}
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
-      <Pressable style={styles.actionButton} onPress={handleLaunch}>
-        <Text style={styles.actionText}>{progress || accepted ? 'Continuer' : 'Lancer'}</Text>
-      </Pressable>
+      {canPlayHunts && (
+        <View style={styles.actions}>
+          {accepted && (
+            <Pressable
+              style={styles.actionButton}
+              disabled={actionLoading}
+              onPress={() => void handleContinue()}
+            >
+              <Text style={styles.actionText}>{t('hunts:detail.primaryAction.continue')}</Text>
+            </Pressable>
+          )}
+          <Pressable
+            style={[styles.actionButton, accepted && styles.leaveButton]}
+            disabled={actionLoading}
+            onPress={() => void handleJoinLeave()}
+          >
+            <Text style={[styles.actionText, accepted && styles.leaveText]}>
+              {actionLoading
+                ? '…'
+                : accepted
+                  ? t('hunts:shared.abandon')
+                  : t('common:buttons.accept')}
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -185,8 +271,20 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, marginBottom: 8 },
   meta: { color: colors.textMuted, marginTop: 6 },
   step: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.glassBorder },
+  stepCompleted: { opacity: 0.72 },
   stepHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   stepTitle: { fontWeight: '700', color: colors.foreground, flex: 1 },
+  stepTitleCompleted: { color: colors.textMuted, textDecorationLine: 'line-through' },
+  stepBadges: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  completedBadge: {
+    backgroundColor: colors.tealSoft,
+    borderColor: colors.teal,
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  completedBadgeText: { color: colors.teal, fontWeight: '800', fontSize: 10 },
   typeBadge: {
     backgroundColor: colors.goldSoft,
     borderColor: colors.gold,
@@ -208,15 +306,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   secondaryButtonText: { color: colors.teal, fontWeight: '800', fontSize: 12 },
+  actions: { marginHorizontal: 16, marginTop: 16, marginBottom: 24, gap: 10 },
   actionButton: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 24,
     backgroundColor: colors.gold,
     paddingVertical: 16,
     borderRadius: radii.md,
     alignItems: 'center',
   },
+  leaveButton: {
+    backgroundColor: 'transparent',
+    borderColor: colors.danger,
+    borderWidth: 1,
+  },
   actionText: { color: colors.background, fontWeight: '900' },
+  leaveText: { color: colors.danger },
   error: { marginHorizontal: 16, marginTop: 16, color: colors.danger, fontWeight: '700' },
 });

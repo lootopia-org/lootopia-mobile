@@ -1,15 +1,11 @@
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StoredImage } from '@/src/components/StoredImage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
+import { useTranslation } from 'react-i18next';
 import { formatDistance, haversineDistanceMeters, type GeoPoint } from '@/src/lib/geo';
 import { colors, radii } from '@/src/theme';
-
-/**
- * "Photo secrète" d'une étape de brouillon Terrain : capture autorisée
- * uniquement à ≤ 15 m du point de l'étape (le partenaire photographie
- * l'indice exactement là où le joueur devra le trouver).
- */
 
 const MAX_CAPTURE_DISTANCE_METERS = 15;
 
@@ -20,6 +16,7 @@ type Props = {
 };
 
 export function PhotoClueCapture({ stepLocation, photoClueUri, onCaptured }: Props) {
+  const { t } = useTranslation(['partner', 'common']);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [checking, setChecking] = useState(false);
@@ -34,13 +31,13 @@ export function PhotoClueCapture({ stepLocation, photoClueUri, onCaptured }: Pro
       if (!permission?.granted) {
         const cameraResult = await requestPermission();
         if (!cameraResult.granted) {
-          setError('Permission caméra refusée.');
+          setError(t('partner:field.photoClueCapture.errors.cameraDenied'));
           return;
         }
       }
       const locationResult = await Location.requestForegroundPermissionsAsync();
       if (!locationResult.granted) {
-        setError('Permission localisation refusée.');
+        setError(t('partner:field.photoClueCapture.errors.locationDenied'));
         return;
       }
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -49,12 +46,12 @@ export function PhotoClueCapture({ stepLocation, photoClueUri, onCaptured }: Pro
         stepLocation
       );
       if (distance > MAX_CAPTURE_DISTANCE_METERS) {
-        setError(`Approche-toi à moins de 15 m du point (tu es à ${formatDistance(distance)}).`);
+        setError(t('partner:field.photoClueCapture.errors.tooFar', { distance: formatDistance(distance) }));
         return;
       }
       setCameraOpen(true);
     } catch {
-      setError('Position GPS indisponible — réessaie en extérieur.');
+      setError(t('partner:field.photoClueCapture.errors.gpsUnavailable'));
     } finally {
       setChecking(false);
     }
@@ -72,7 +69,7 @@ export function PhotoClueCapture({ stepLocation, photoClueUri, onCaptured }: Pro
       }
       setCameraOpen(false);
     } catch {
-      setError('Échec de la capture, réessaie.');
+      setError(t('partner:field.photoClueCapture.errors.captureFailed'));
       setCameraOpen(false);
     } finally {
       setCapturing(false);
@@ -87,11 +84,11 @@ export function PhotoClueCapture({ stepLocation, photoClueUri, onCaptured }: Pro
             <ActivityIndicator size="small" color={colors.teal} />
           ) : (
             <Text style={styles.buttonText}>
-              📷 {photoClueUri ? 'Reprendre la photo secrète' : 'Photo secrète'}
+              {photoClueUri ? t('partner:field.photoClueCapture.buttonRetake') : t('partner:field.photoClueCapture.buttonNew')}
             </Text>
           )}
         </Pressable>
-        {photoClueUri ? <Image source={{ uri: photoClueUri }} style={styles.thumbnail} /> : null}
+        {photoClueUri ? <StoredImage storedUrl={photoClueUri} style={styles.thumbnail} /> : null}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -100,7 +97,7 @@ export function PhotoClueCapture({ stepLocation, photoClueUri, onCaptured }: Pro
           <CameraView ref={cameraRef} style={styles.camera} facing="back" />
           <View style={styles.controls}>
             <Pressable style={styles.cancelButton} onPress={() => setCameraOpen(false)}>
-              <Text style={styles.cancelText}>Annuler</Text>
+              <Text style={styles.cancelText}>{t('common:cancel')}</Text>
             </Pressable>
             <Pressable style={styles.shutter} onPress={capture} disabled={capturing}>
               {capturing ? <ActivityIndicator color={colors.background} /> : <View style={styles.shutterInner} />}

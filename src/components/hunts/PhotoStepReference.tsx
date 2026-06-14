@@ -1,15 +1,10 @@
 import React, { useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { StoredImage } from '@/src/components/StoredImage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useTranslation } from 'react-i18next';
 import { uploadStepImage } from '@/src/lib/upload-api';
+import { mapUploadErrorMessage } from '@/src/lib/upload-errors';
 import { colors, radii } from '@/src/theme';
 
 type Props = {
@@ -18,6 +13,7 @@ type Props = {
 };
 
 export function PhotoStepReference({ answer, onAnswerChange }: Props) {
+  const { t } = useTranslation(['partner', 'common', 'hunts']);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -29,7 +25,7 @@ export function PhotoStepReference({ answer, onAnswerChange }: Props) {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
-        setError('Permission caméra refusée.');
+        setError(t('partner:editor.photoReference.errors.cameraDenied'));
         return;
       }
     }
@@ -45,13 +41,14 @@ export function PhotoStepReference({ answer, onAnswerChange }: Props) {
     try {
       const photo = await cameraRef.current?.takePictureAsync({ quality: 0.85 });
       if (!photo?.uri) {
-        throw new Error('Capture échouée');
+        throw new Error(t('partner:editor.photoReference.errors.captureFailed'));
       }
       const url = await uploadStepImage(photo.uri);
       onAnswerChange(url);
       setCameraOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload échoué');
+      const message = err instanceof Error ? err.message : t('partner:editor.photoReference.errors.uploadFailed');
+      setError(mapUploadErrorMessage(message, t('hunts:capture.errors.wrongAccount')));
       setCameraOpen(false);
     } finally {
       setUploading(false);
@@ -61,15 +58,17 @@ export function PhotoStepReference({ answer, onAnswerChange }: Props) {
   return (
     <View style={styles.wrap}>
       {answer ? (
-        <Image source={{ uri: answer }} style={styles.preview} />
+        <StoredImage storedUrl={answer} style={styles.preview} />
       ) : (
-        <Text style={styles.hint}>Photo de référence requise</Text>
+        <Text style={styles.hint}>{t('partner:editor.photoReference.hint')}</Text>
       )}
       <Pressable style={styles.button} onPress={() => void openCamera()} disabled={uploading}>
         {uploading ? (
           <ActivityIndicator color={colors.background} size="small" />
         ) : (
-          <Text style={styles.buttonText}>{answer ? 'Reprendre' : 'Capturer'}</Text>
+          <Text style={styles.buttonText}>
+            {answer ? t('partner:editor.photoReference.retake') : t('partner:editor.photoReference.capture')}
+          </Text>
         )}
       </Pressable>
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -79,10 +78,12 @@ export function PhotoStepReference({ answer, onAnswerChange }: Props) {
           <CameraView ref={cameraRef} style={styles.camera} />
           <View style={styles.modalActions}>
             <Pressable style={styles.modalButton} onPress={() => setCameraOpen(false)}>
-              <Text style={styles.modalButtonText}>Annuler</Text>
+              <Text style={styles.modalButtonText}>{t('common:cancel')}</Text>
             </Pressable>
             <Pressable style={[styles.modalButton, styles.modalButtonPrimary]} onPress={() => void captureAndUpload()}>
-              <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>Capturer</Text>
+              <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
+                {t('partner:editor.photoReference.capture')}
+              </Text>
             </Pressable>
           </View>
         </View>
