@@ -14,7 +14,6 @@ import { PlayerCharacter3D } from '@/src/components/PlayerCharacter3D';
 import { colors, darkMapStyle, glassStrongCard, radii } from '@/src/theme';
 import { bearingDegrees, formatDistance, haversineDistanceMeters, smoothPosition, type GeoPoint } from '@/src/lib/geo';
 import { getFps } from '@/src/lib/perf';
-import { recordBreadcrumb } from '@/src/lib/heatmap';
 import { huntJoinErrorMessage } from '@/src/lib/hunt-join-errors';
 import { useCatalogHuntEvents } from '@/src/hooks/use-catalog-hunt-events';
 import { usePlayerProfile } from '@/src/hooks/usePlayerProfile';
@@ -157,9 +156,6 @@ export default function MapScreen() {
     if (followingRef.current) {
       mapRef.current?.animateCamera({ center: smoothed }, { duration: 800 });
     }
-    // Alimente la heatmap joueur (échantillonnage géré par la lib).
-    void recordBreadcrumb(smoothed);
-
     // Adaptation du profil GPS à la distance de la chasse la plus proche.
     const distances = huntsRef.current.map((hunt) => haversineDistanceMeters(smoothed, hunt.location));
     const nearest = distances.length > 0 ? Math.min(...distances) : Infinity;

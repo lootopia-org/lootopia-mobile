@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -7,24 +7,21 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import MapView, { Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useAuth } from '@/src/state/AuthContext';
 import { useLiveOps } from '@/src/state/LiveOpsContext';
 import { useLiveEventsContext } from '@/src/state/LiveEventsContext';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
-import { clearHeatmap, getHeatCells, type HeatCell } from '@/src/lib/heatmap';
+import { useCatalogHuntEvents } from '@/src/hooks/use-catalog-hunt-events';
 import type { GeoPoint } from '@/src/lib/geo';
-import { colors, darkMapStyle, glassCard, glassStrongCard, radii } from '@/src/theme';
+import { colors, glassCard, glassStrongCard, radii } from '@/src/theme';
 
-type Section = 'creation' | 'liveops' | 'heatmap';
+type Section = 'creation' | 'liveops';
 
-const SECTION_KEYS: Section[] = ['creation', 'liveops', 'heatmap'];
-
-const HEATMAP_FALLBACK_CENTER: GeoPoint = { latitude: 37.8044, longitude: -122.2712 };
+const SECTION_KEYS: Section[] = ['creation', 'liveops'];
 
 const getCurrentPoint = async (): Promise<GeoPoint | null> => {
   const permission = await Location.requestForegroundPermissionsAsync();
@@ -79,7 +76,6 @@ export default function FieldScreen() {
 
       {section === 'creation' ? <CreationSection /> : null}
       {section === 'liveops' ? <LiveOpsSection /> : null}
-      {section === 'heatmap' ? <HeatmapSection /> : null}
     </ScrollView>
   );
 }
@@ -87,12 +83,37 @@ export default function FieldScreen() {
 function CreationSection() {
   const router = useRouter();
   const { t } = useTranslation(['hunts', 'common']);
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const [hunts, setHunts] = useState<Chase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creatingHere, setCreatingHere] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    if (!user?.id) {
+      return;
+    }
+    setLoading(true);
+    chaseApi
+      .getManagedChases(user.id)
+      .then(setHunts)
+      .catch(() => setHunts([]))
+      .finally(() => setLoading(false));
+  }, [user?.id]);
+
+  useEffect(load, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  useCatalogHuntEvents(load);
 
   const startHere = async () => {
     setError(null);
-    setLoading(true);
+    setCreatingHere(true);
     try {
       const point = await getCurrentPoint();
       if (!point) {
@@ -103,23 +124,52 @@ function CreationSection() {
     } catch {
       setError(t('partner:field.creation.errors.gpsUnavailable'));
     } finally {
-      setLoading(false);
+      setCreatingHere(false);
     }
   };
 
   return (
     <View style={styles.creation}>
-      <Pressable style={styles.primaryButton} onPress={() => router.push('/partner/hunts')}>
-        <Text style={styles.primaryButtonText}>{t('partner:field.creation.myHunts')}</Text>
-      </Pressable>
-      <Pressable style={styles.secondaryButton} onPress={() => void startHere()} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color={colors.teal} size="small" />
-        ) : (
-          <Text style={styles.secondaryButtonText}>{t('partner:field.creation.newHuntHere')}</Text>
-        )}
-      </Pressable>
+      <View style={styles.creationActions}>
+        <Pressable style={styles.primaryButton} onPress={() => router.push('/partner/hunts/new')}>
+          <Text style={styles.primaryButtonText}>{t('partner:field.creation.newHunt')}</Text>
+        </Pressable>
+        <Pressable style={styles.secondaryButton} onPress={() => void startHere()} disabled={creatingHere}>
+          {creatingHere ? (
+            <ActivityIndicator color={colors.teal} size="small" />
+          ) : (
+            <Text style={styles.secondaryButtonText}>{t('partner:field.creation.newHuntHere')}</Text>
+          )}
+        </Pressable>
+      </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      {loading ? <ActivityIndicator color={colors.teal} style={{ marginTop: 16 }} /> : null}
+
+      {!loading && hunts.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>{t('partner:hunts.empty')}</Text>
+        </View>
+      ) : null}
+
+      {hunts.map((hunt) => (
+        <Pressable
+          key={hunt.id}
+          style={styles.card}
+          onPress={() => router.push(`/partner/hunts/${hunt.id}`)}
+        >
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {hunt.title || t('partner:hunts.untitled')}
+          </Text>
+          <Text style={styles.cardMeta}>
+            {t('partner:hunts.cardMeta', {
+              stepCount: hunt.steps.length,
+              suffix: hunt.steps.length > 1 ? 's' : '',
+              status: t(`partner:hunts.status.${hunt.status}`),
+            })}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -312,80 +362,6 @@ function LiveOpsSection() {
   );
 }
 
-function HeatmapSection() {
-  const { t } = useTranslation(['hunts', 'common']);
-  const [cells, setCells] = useState<HeatCell[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = () => {
-    setLoading(true);
-    getHeatCells()
-      .then(setCells)
-      .catch(() => setCells([]))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(reload, []);
-
-  const handleClear = async () => {
-    await clearHeatmap();
-    setCells([]);
-  };
-
-  const center = cells[0] ?? HEATMAP_FALLBACK_CENTER;
-  const totalPoints = cells.reduce((sum, cell) => sum + cell.weight, 0);
-
-  return (
-    <View>
-      <View style={styles.mapCard}>
-        <MapView
-          style={styles.map}
-          provider={PROVIDER_DEFAULT}
-          customMapStyle={darkMapStyle}
-          initialRegion={{
-            latitude: center.latitude,
-            longitude: center.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }}
-        >
-          {cells.map((cell, index) => (
-            <Circle
-              key={`${cell.latitude}-${cell.longitude}-${index}`}
-              center={{ latitude: cell.latitude, longitude: cell.longitude }}
-              radius={Math.min(30 + cell.weight * 10, 80)}
-              fillColor={`rgba(212, 175, 55, ${Math.min(0.12 + cell.weight * 0.06, 0.5)})`}
-              strokeColor="transparent"
-            />
-          ))}
-        </MapView>
-      </View>
-
-      <View style={styles.heatStatsRow}>
-        <View style={styles.heatStat}>
-          <Text style={styles.heatStatValue}>{cells.length}</Text>
-          <Text style={styles.heatStatLabel}>{t('partner:field.heatmap.stats.cells')}</Text>
-        </View>
-        <View style={styles.heatStat}>
-          <Text style={[styles.heatStatValue, { color: colors.gold }]}>{totalPoints}</Text>
-          <Text style={styles.heatStatLabel}>{t('partner:field.heatmap.stats.points')}</Text>
-        </View>
-      </View>
-
-      {loading ? <ActivityIndicator color={colors.teal} style={{ marginTop: 12 }} /> : null}
-      {!loading && cells.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>{t('partner:field.heatmap.empty')}</Text>
-        </View>
-      ) : null}
-
-      <Pressable style={styles.clearButton} onPress={() => void handleClear()}>
-        <Text style={styles.clearButtonText}>{t('partner:field.heatmap.clear')}</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { fontSize: 28, fontWeight: '900', color: colors.foreground, marginBottom: 16 },
@@ -406,6 +382,7 @@ const styles = StyleSheet.create({
   segmentText: { color: colors.textMuted, fontWeight: '800', fontSize: 13 },
   segmentTextActive: { color: colors.gold },
   creation: { gap: 12 },
+  creationActions: { gap: 12 },
   primaryButton: {
     backgroundColor: colors.gold,
     borderRadius: radii.md,
@@ -477,19 +454,4 @@ const styles = StyleSheet.create({
   smallActionText: { color: colors.textMuted, fontWeight: '800', fontSize: 11 },
   smallActionTextPaused: { color: colors.danger },
   smallActionTextTeal: { color: colors.teal, fontWeight: '800', fontSize: 11 },
-  mapCard: { ...glassCard, overflow: 'hidden', marginBottom: 12 },
-  map: { height: 320, width: '100%' },
-  heatStatsRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  heatStat: { ...glassCard, flex: 1, paddingVertical: 14, alignItems: 'center' },
-  heatStatValue: { color: colors.foreground, fontSize: 22, fontWeight: '900' },
-  heatStatLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '700', marginTop: 4 },
-  clearButton: {
-    borderColor: colors.danger,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    backgroundColor: 'rgba(248,113,113,0.08)',
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  clearButtonText: { color: colors.danger, fontWeight: '800', fontSize: 13 },
 });

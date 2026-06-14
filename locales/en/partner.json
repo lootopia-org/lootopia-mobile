@@ -48,17 +48,20 @@
     "editLoadError": "Hunt not found",
     "accessDenied": "Access restricted to organizers",
     "title": "My hunts",
-    "stepsMeta": "{count} steps · {status}"
+    "stepsMeta": "{count} steps · {status}",
+    "detail": {
+      "edit": "Edit hunt",
+      "delete": "Delete hunt"
+    }
   },
   "field": {
     "header": "Field",
     "segments": {
       "creation": "Creation",
-      "liveops": "Live ops",
-      "heatmap": "Heatmap"
+      "liveops": "Live ops"
     },
     "creation": {
-      "myHunts": "My hunts",
+      "newHunt": "New hunt",
       "newHuntHere": "New hunt here",
       "errors": {
         "locationDenied": "Location permission denied.",

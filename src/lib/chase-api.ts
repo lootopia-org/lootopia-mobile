@@ -88,6 +88,67 @@ export type UserProgress = {
   stepProgress: StepProgress[];
 };
 
+export type HuntStepAnalytics = {
+  stepId: string;
+  order: number;
+  title: string;
+  latitude?: string;
+  longitude?: string;
+  completionCount: number;
+};
+
+export type HuntAnalytics = {
+  huntId: string;
+  participantCount: number;
+  completedHuntCount: number;
+  steps: HuntStepAnalytics[];
+  userLocations: Array<{ latitude: string; longitude: string }>;
+};
+
+export type HuntParticipant = {
+  userId: string;
+  email: string;
+  points?: number;
+  level?: number;
+  completedHunts?: number;
+  pointsAwarded: number;
+  joinedAt?: string;
+  completedAt?: string;
+};
+
+type ApiStepAnalyticsRaw = {
+  stepId: string;
+  stepOrder?: number;
+  order?: number;
+  title: string;
+  latitude?: string;
+  longitude?: string;
+  completionCount: number;
+};
+
+type ApiHuntAnalyticsRaw = {
+  huntId: string;
+  participantCount: number;
+  completedHuntCount: number;
+  steps: ApiStepAnalyticsRaw[];
+  userLocations: Array<{ latitude: string; longitude: string }>;
+};
+
+const normalizeAnalytics = (raw: ApiHuntAnalyticsRaw): HuntAnalytics => ({
+  huntId: raw.huntId,
+  participantCount: raw.participantCount,
+  completedHuntCount: raw.completedHuntCount,
+  userLocations: raw.userLocations ?? [],
+  steps: (raw.steps ?? []).map((step) => ({
+    stepId: step.stepId,
+    order: step.order ?? step.stepOrder ?? 0,
+    title: step.title,
+    latitude: step.latitude,
+    longitude: step.longitude,
+    completionCount: step.completionCount,
+  })),
+});
+
 const localProgressStore = new Map<string, UserProgress>();
 
 const normalizeChase = (raw: ApiHuntRaw): Chase => fromApiHunt(raw);
@@ -300,5 +361,15 @@ export const chaseApi = {
 
   deleteChase: async (chaseId: string): Promise<void> => {
     await apiRequest<void>(`/hunt/${chaseId}`, { method: 'DELETE' });
+  },
+
+  getHuntAnalytics: async (huntId: string): Promise<HuntAnalytics> => {
+    const raw = await apiRequest<ApiHuntAnalyticsRaw>(`/hunt/${huntId}/analytics`);
+    return normalizeAnalytics(raw);
+  },
+
+  getHuntParticipants: async (huntId: string): Promise<HuntParticipant[]> => {
+    const response = await apiRequest<HuntParticipant[]>(`/hunt/${huntId}/participants`);
+    return Array.isArray(response) ? response : [];
   },
 };

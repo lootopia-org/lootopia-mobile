@@ -33,7 +33,7 @@ export default function NewHuntScreen() {
         mode="create"
         initial={initial}
         partnerId={user?.id}
-        onSaved={() => router.replace('/partner/hunts')}
+        onSaved={(huntId) => router.replace(`/partner/hunts/${huntId}`)}
         onCancel={() => router.back()}
       />
     </View>

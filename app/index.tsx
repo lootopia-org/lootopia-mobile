@@ -2,15 +2,22 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useAuth } from '@/src/state/AuthContext';
+import { isPlayerUser } from '@/src/lib/player-access';
 
 export default function Index() {
   const router = useRouter();
-  const { isReady, isAuthenticated } = useAuth();
+  const { isReady, isAuthenticated, user } = useAuth();
+
+  const destination = !isAuthenticated
+    ? '/(auth)/login'
+    : isPlayerUser(user)
+      ? '/(tabs)/chases'
+      : '/(tabs)/field';
 
   useEffect(() => {
     if (!isReady) return;
-    router.replace(isAuthenticated ? '/(tabs)/chases' : '/(auth)/login');
-  }, [isReady, isAuthenticated, router]);
+    router.replace(destination);
+  }, [isReady, destination, router]);
 
   if (!isReady) {
     return (
@@ -20,5 +27,5 @@ export default function Index() {
     );
   }
 
-  return <Redirect href={isAuthenticated ? '/(tabs)/chases' : '/(auth)/login'} />;
+  return <Redirect href={destination} />;
 }

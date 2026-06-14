@@ -202,7 +202,7 @@ export default {
         },
         qr: {
           alt: 'QR code pour ouvrir la capture mobile',
-          expoHint: 'Lien Expo Go (scannez avec l’appareil photo) :',
+          expoHint: 'Scannez avec l’appareil photo :',
           signInHint:
             'Connectez-vous sur mobile avec le même compte partenaire, puis scannez ce QR ou ouvrez :',
         },
@@ -214,9 +214,9 @@ export default {
         captureRedirect: {
           invalidTitle: 'Lien de capture invalide',
           invalidMessage: 'Lancez une nouvelle capture depuis l’assistant web.',
-          expoTitle: 'Ouvrir dans Expo Go',
+          expoTitle: 'Ouvrir dans Lootopia Mobile',
           expoMessage:
-            'Ouvrez d’abord Lootopia Mobile dans Expo Go (même tunnel), puis appuyez ci-dessous. Connectez-vous avec votre compte partenaire avant de prendre la photo.',
+            'Ouvrez d’abord Lootopia Mobile, puis appuyez ci-dessous. Connectez-vous avec votre compte partenaire avant de prendre la photo.',
           openCapture: 'Ouvrir la capture dans Lootopia Mobile',
         },
       },
