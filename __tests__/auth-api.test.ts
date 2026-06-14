@@ -125,7 +125,9 @@ describe('authApi', () => {
         expect.stringContaining('/auth/mfa/totp'),
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ token, code }),
+          credentials: 'omit',
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          body: JSON.stringify({ code }),
         })
       );
       expect(result).toEqual(mockResponse);
@@ -204,7 +206,8 @@ describe('authApi', () => {
         expect.stringContaining('/auth/logout'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          credentials: 'omit',
         })
       );
     });
@@ -227,7 +230,8 @@ describe('authApi', () => {
         expect.stringContaining('/auth/me'),
         expect.objectContaining({
           method: 'GET',
-          headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          credentials: 'omit',
         })
       );
       expect(result).toEqual(mockUser);
@@ -250,7 +254,8 @@ describe('authApi', () => {
         expect.stringContaining('/auth/totp/enroll/begin'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          credentials: 'omit',
         })
       );
       expect(result).toEqual(mockResponse);
@@ -268,7 +273,8 @@ describe('authApi', () => {
         expect.stringContaining('/auth/totp/enroll/verify'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          credentials: 'omit',
           body: JSON.stringify({ code }),
         })
       );
@@ -286,7 +292,8 @@ describe('authApi', () => {
         expect.stringContaining('/auth/totp/disable'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          credentials: 'omit',
           body: JSON.stringify({ code }),
         })
       );
@@ -309,7 +316,8 @@ describe('authApi', () => {
         expect.stringContaining('/auth/webauthn/register/begin'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          credentials: 'omit',
         })
       );
       expect(result).toEqual(mockResponse);
@@ -328,7 +336,8 @@ describe('authApi', () => {
         expect.stringContaining('/auth/webauthn/register/complete'),
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          credentials: 'omit',
           body: JSON.stringify({ handle, credential }),
         })
       );
@@ -348,7 +357,8 @@ describe('authApi', () => {
         expect.stringContaining('/auth/webauthn/credentials'),
         expect.objectContaining({
           method: 'GET',
-          headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+          headers: expect.objectContaining({ Cookie: `session=${token}` }),
+          credentials: 'omit',
         })
       );
       expect(result).toEqual(mockCredentials);

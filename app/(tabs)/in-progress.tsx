@@ -1,36 +1,34 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
 import { useHunts } from '@/src/state/HuntsContext';
-import { useLiveOps } from '@/src/state/LiveOpsContext';
+import { useLiveEventsContext } from '@/src/state/LiveEventsContext';
 import { colors, glassCard, radii } from '@/src/theme';
 
 export default function InProgressScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { acceptedHunts, abandonHunt, setHuntPaused } = useHunts();
-  const { isHuntLivePaused } = useLiveOps();
+  const { subscribeHuntEvents } = useLiveEventsContext();
   const [hunts, setHunts] = useState<Chase[]>([]);
 
-  useEffect(() => {
-    chaseApi.getChases().then(setHunts).catch(() => setHunts([]));
+  const loadHunts = useCallback(() => {
+    chaseApi.getJoinedHunts().then(setHunts).catch(() => setHunts([]));
   }, []);
 
-  const inProgress = useMemo(
-    () => hunts.filter((hunt) => Boolean(acceptedHunts[hunt.id])),
-    [hunts, acceptedHunts]
-  );
+  useEffect(() => {
+    loadHunts();
+  }, [loadHunts]);
+
+  useEffect(() => subscribeHuntEvents(() => loadHunts()), [subscribeHuntEvents, loadHunts]);
+
+  const inProgress = hunts;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
-      <Text style={styles.header}>🎯 Chasses en cours</Text>
-      <Text style={styles.subheader}>
-        {inProgress.length === 0
-          ? 'Aucune chasse acceptée pour le moment'
-          : `${inProgress.length} chasse${inProgress.length > 1 ? 's' : ''} active${inProgress.length > 1 ? 's' : ''}`}
-      </Text>
+      <Text style={styles.header}>En cours</Text>
 
       <FlatList
         data={inProgress}
@@ -38,11 +36,8 @@ export default function InProgressScreen() {
         contentContainerStyle={{ paddingBottom: 24, gap: 12 }}
         ListEmptyComponent={
           <Pressable style={styles.emptyCard} onPress={() => router.push('/(tabs)/chases')}>
-            <Text style={styles.emptyTitle}>Pars à l'aventure !</Text>
-            <Text style={styles.emptyText}>
-              Découvre les chasses disponibles autour de toi et accepte ta première quête.
-            </Text>
-            <Text style={styles.emptyCta}>Voir les chasses disponibles →</Text>
+            <Text style={styles.emptyText}>Aucune chasse en cours</Text>
+            <Text style={styles.emptyCta}>Voir les chasses</Text>
           </Pressable>
         }
         renderItem={({ item: hunt }) => {
@@ -52,7 +47,7 @@ export default function InProgressScreen() {
           const ratio = total > 0 ? completed / total : 0;
           const nextStep = hunt.steps.find((step) => !progress?.completedStepIds.includes(step.id));
           const playerPaused = Boolean(progress?.paused);
-          const livePaused = isHuntLivePaused(hunt.id);
+          const livePaused = hunt.status === 'paused';
 
           return (
             <View style={[styles.card, (playerPaused || livePaused) && styles.cardPaused]}>
@@ -60,7 +55,7 @@ export default function InProgressScreen() {
                 <Text style={styles.cardTitle}>{hunt.title}</Text>
                 {livePaused ? (
                   <View style={[styles.statusPill, styles.statusPillDanger]}>
-                    <Text style={styles.statusPillDangerText}>⛔ Suspendue par l’organisateur</Text>
+                    <Text style={styles.statusPillDangerText}>⛔ Suspendue par l'organisateur</Text>
                   </View>
                 ) : playerPaused ? (
                   <View style={styles.statusPill}>
@@ -107,8 +102,7 @@ export default function InProgressScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 16 },
-  header: { fontSize: 26, fontWeight: '900', color: colors.foreground },
-  subheader: { color: colors.textMuted, fontSize: 13, marginTop: 4, marginBottom: 16 },
+  header: { fontSize: 26, fontWeight: '900', color: colors.foreground, marginBottom: 16 },
   card: { ...glassCard, padding: 16 },
   cardPaused: { opacity: 0.75 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
@@ -129,7 +123,6 @@ const styles = StyleSheet.create({
   resumeText: { color: colors.background, fontWeight: '900', fontSize: 12 },
   abandon: { color: colors.textFaint, fontSize: 11, marginTop: 12, textDecorationLine: 'underline' },
   emptyCard: { ...glassCard, padding: 24, alignItems: 'center', marginTop: 24 },
-  emptyTitle: { color: colors.foreground, fontSize: 17, fontWeight: '900' },
-  emptyText: { color: colors.textMuted, fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 19 },
-  emptyCta: { color: colors.teal, fontWeight: '800', fontSize: 13, marginTop: 14 },
+  emptyText: { color: colors.textMuted, fontSize: 14, textAlign: 'center' },
+  emptyCta: { color: colors.teal, fontWeight: '800', fontSize: 13, marginTop: 10 },
 });

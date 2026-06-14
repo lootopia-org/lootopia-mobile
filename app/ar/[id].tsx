@@ -4,51 +4,66 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ARExperience } from '@/src/components/ARExperience';
+import { StepAnswerInput } from '@/src/components/hunts/StepAnswerInput';
+import { StepPhotoCapture } from '@/src/components/hunts/StepPhotoCapture';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import type { HuntStepType } from '@/src/lib/hunt-types';
 import { profileApi } from '@/src/lib/profile-api';
 import { useAuth } from '@/src/state/AuthContext';
 import { useHunts } from '@/src/state/HuntsContext';
 import { useLiveOps } from '@/src/state/LiveOpsContext';
+import { useLiveEventsContext } from '@/src/state/LiveEventsContext';
 import { colors, radii } from '@/src/theme';
 
 export default function ARScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, clue, stepId } = useLocalSearchParams<{ id: string; clue?: string; stepId?: string }>();
-  const { getStepOverride, isHuntLivePaused } = useLiveOps();
+  const { id, stepId } = useLocalSearchParams<{ id: string; stepId?: string }>();
+  const { getStepOverride, syncFromServer } = useLiveOps();
+  const { subscribeHuntEvents } = useLiveEventsContext();
   const { token } = useAuth();
   const { acceptedHunts, completeStep: completeStepLocally } = useHunts();
   const [chase, setChase] = useState<Chase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
       return;
     }
 
-    (async () => {
+    const loadChase = async () => {
       try {
         setIsLoading(true);
         setChase(await chaseApi.getChase(id));
+      } catch {
+        setError('Chasse introuvable');
       } finally {
         setIsLoading(false);
       }
-    })();
-  }, [id]);
+    };
+
+    void loadChase();
+    void syncFromServer(id);
+    return subscribeHuntEvents((event) => {
+      const payload = event.payload as { id?: string; huntId?: string } | undefined;
+      if (payload?.id === id || payload?.huntId === id || event.resourceId === id) {
+        void loadChase();
+        void syncFromServer(id);
+      }
+    });
+  }, [id, subscribeHuntEvents, syncFromServer]);
 
   const step = chase?.steps.find((item) => item.id === stepId) ?? chase?.steps[0];
+  const stepType: HuntStepType = step?.type ?? 'checkpoint';
 
-  const handleComplete = async () => {
+  const finishStep = async (answer?: string) => {
     if (!chase || !step) {
       return;
     }
-    // On valide côté API mais on reste sur l'écran : le joueur voit le coffre
-    // s'ouvrir, puis revient avec le bouton retour.
-    await chaseApi.completeStep(chase.id, step.id);
-    // Progression locale (liste "En cours").
+    await chaseApi.completeStep(chase.id, step.id, answer);
     await completeStepLocally(chase.id, step.id);
 
-    // Dernière étape ? PATCH /profile {huntId} crédite les points de la chasse.
     const alreadyDone = acceptedHunts[chase.id]?.completedStepIds ?? [];
     const doneAfter = new Set([...alreadyDone, step.id]);
     const isHuntComplete = chase.steps.every((item) => doneAfter.has(item.id));
@@ -56,8 +71,7 @@ export default function ARScreen() {
       try {
         await profileApi.completeHunt(token, chase.id);
       } catch {
-        // Best-effort : la complétion locale reste acquise même si le serveur
-        // est injoignable ; les points seront re-crédités au prochain passage.
+        // best-effort
       }
     }
   };
@@ -70,38 +84,66 @@ export default function ARScreen() {
     );
   }
 
-  if (!chase) {
+  if (!chase || !step) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notFoundText}>Chasse introuvable.</Text>
+        <Text style={styles.notFoundText}>{error ?? 'Étape introuvable'}</Text>
       </View>
     );
   }
 
+  if (!step.location) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.notFoundText}>Coordonnées manquantes</Text>
+      </View>
+    );
+  }
+
+  const stepLocation = step.location;
+  const liveOverride = {
+    huntPaused: chase.status === 'paused',
+    stepPaused: getStepOverride(chase.id, step.id)?.paused,
+    redirect: getStepOverride(chase.id, step.id)?.redirect,
+  };
+
+  const renderStepContent = () => {
+    if (stepType === 'riddle' || stepType === 'clue') {
+      return (
+        <StepAnswerInput
+          description={step.description}
+          onSubmit={(answer) => finishStep(answer)}
+          placeholder={stepType === 'riddle' ? 'Réponse' : 'Indice / code'}
+        />
+      );
+    }
+
+    if (stepType === 'photo') {
+      return <StepPhotoCapture description={step.description} onSubmit={(url) => finishStep(url)} />;
+    }
+
+    return (
+      <ARExperience
+        clue={step.description}
+        targetLocation={stepLocation}
+        radiusMeters={step.radiusMeters ?? 30}
+        qrPayload={stepType === 'qr_code' ? step.answer : step.qrPayload}
+        photoClueUri={step.photoClueUri}
+        audioHintUri={step.audioHintUri}
+        liveOverride={liveOverride}
+        fullScreen
+        combatEnabled={stepType === 'ar'}
+        onComplete={(answer) => {
+          void finishStep(answer);
+        }}
+      />
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* L'expérience AR occupe tout l'écran. */}
-      <ARExperience
-        clue={step?.clue ?? clue ?? 'Indice indisponible'}
-        targetLocation={step?.location ?? { latitude: 43.2965, longitude: 5.3698 }}
-        radiusMeters={step?.radiusMeters ?? 100}
-        qrPayload={step?.qrPayload}
-        photoClueUri={step?.photoClueUri}
-        audioHintUri={step?.audioHintUri}
-        liveOverride={
-          step
-            ? {
-                huntPaused: isHuntLivePaused(chase.id),
-                stepPaused: getStepOverride(chase.id, step.id)?.paused,
-                redirect: getStepOverride(chase.id, step.id)?.redirect,
-              }
-            : undefined
-        }
-        fullScreen
-        onComplete={handleComplete}
-      />
+      {renderStepContent()}
 
-      {/* En-tête superposé : retour + contexte de l'étape. */}
       <View style={[styles.topBar, { top: insets.top + 10 }]} pointerEvents="box-none">
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={colors.foreground} />
@@ -110,11 +152,9 @@ export default function ARScreen() {
           <Text style={styles.titleText} numberOfLines={1}>
             {chase.title}
           </Text>
-          {step && (
-            <Text style={styles.stepText} numberOfLines={1}>
-              {step.title}
-            </Text>
-          )}
+          <Text style={styles.stepText} numberOfLines={1}>
+            {step.title}
+          </Text>
         </View>
       </View>
     </View>

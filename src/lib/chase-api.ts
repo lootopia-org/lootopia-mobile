@@ -1,8 +1,12 @@
-import * as SecureStore from 'expo-secure-store';
-
-// Même API que l'auth (contrat /hunt, /profile, /auth sur le même serveur).
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
-const TOKEN_KEY = 'lootopia-mobile-token';
+import { apiRequest } from '@/src/lib/api-client';
+import {
+  fromApiHunt,
+  toCreateHuntPayload,
+  toUpdateHuntPayload,
+  toApiStep,
+  type ApiHuntRaw,
+} from '@/src/lib/hunt-mappers';
+import type { HuntForm, HuntStepForm } from '@/src/lib/hunt-types';
 
 export type Partner = {
   id: string;
@@ -27,8 +31,9 @@ export type ChaseStep = {
   title: string;
   description: string;
   clue: string;
-  // Optionnel : les étapes "checkpoint" sont géolocalisées, les étapes
-  // "riddle" (réponse à une énigme) n'ont pas de position.
+  type?: import('@/src/lib/hunt-types').HuntStepType;
+  answer?: string;
+  points?: number;
   location?: {
     latitude: number;
     longitude: number;
@@ -36,16 +41,10 @@ export type ChaseStep = {
   arContent?: ARContent;
   reward?: number;
   completed: boolean;
-  // Champs propres au mobile : rayon de proximité GPS + indice affiché en AR.
   radiusMeters?: number;
   arHint?: string;
-  // Contenu d'un QR code physique qui valide l'étape (alternative au GPS,
-  // utile en intérieur). Format conseillé : "lootopia:<step-id>".
   qrPayload?: string;
-  // Indice photo capturé sur site par le partenaire — révélé au joueur
-  // uniquement à moins de 15 m du point ("photo secrecy").
   photoClueUri?: string;
-  // Indice audio (10 s max) enregistré sur site par le partenaire.
   audioHintUri?: string;
 };
 
@@ -54,6 +53,7 @@ export type Chase = {
   title: string;
   description: string;
   image?: string;
+  partnerId: string;
   partner: Partner;
   difficulty: 'easy' | 'medium' | 'hard';
   estimatedDuration: number;
@@ -63,7 +63,7 @@ export type Chase = {
   };
   createdAt: string;
   updatedAt: string;
-  status: 'active' | 'draft' | 'archived';
+  status: 'active' | 'draft' | 'archived' | 'paused';
   participants: number;
   rating: number;
   steps: ChaseStep[];
@@ -87,64 +87,9 @@ export type UserProgress = {
   stepProgress: StepProgress[];
 };
 
-type ApiError = {
-  message?: string;
-};
-
-// Suivi LOCAL de la progression par étape : le contrat backend ne gère pas les
-// étapes individuellement (la complétion d'une chasse passe par
-// PATCH /profile {huntId}) — ce n'est pas un mock, c'est l'état de jeu client.
 const localProgressStore = new Map<string, UserProgress>();
 
-const parseJson = async <T,>(response: Response): Promise<T> => {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    return (await response.json()) as T;
-  }
-
-  return {} as T;
-};
-
-const getToken = async () => SecureStore.getItemAsync(TOKEN_KEY);
-
-const request = async <T,>(path: string, init: RequestInit = {}) => {
-  const token = await getToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const body = await parseJson<ApiError>(response);
-    throw new Error(body.message || `Requête échouée (${response.status})`);
-  }
-
-  return parseJson<T>(response);
-};
-
-// Le backend ne renvoie pas forcément tous les champs : `GET /hunt` (liste) ne
-// contient PAS les étapes (inline uniquement sur `GET /hunt/{id}`), et
-// rating/participants/location peuvent manquer. On normalise la forme.
-const normalizeChase = (raw: Partial<Chase> & { id: string }): Chase => ({
-  id: raw.id,
-  title: raw.title ?? 'Chasse sans titre',
-  description: raw.description ?? '',
-  image: raw.image,
-  difficulty: raw.difficulty ?? 'easy',
-  estimatedDuration: raw.estimatedDuration ?? 0,
-  createdAt: raw.createdAt ?? new Date(0).toISOString(),
-  updatedAt: raw.updatedAt ?? new Date(0).toISOString(),
-  status: raw.status ?? 'active',
-  participants: raw.participants ?? 0,
-  rating: raw.rating ?? 0,
-  partner: raw.partner ?? { id: 'unknown', name: 'Lootopia', email: '', chases: [] },
-  location: raw.location ?? { latitude: 0, longitude: 0 },
-  steps: Array.isArray(raw.steps) ? raw.steps : [],
-});
+const normalizeChase = (raw: ApiHuntRaw): Chase => fromApiHunt(raw);
 
 const normalizeChasesResponse = (response: unknown): Chase[] => {
   let list: unknown[] = [];
@@ -160,9 +105,7 @@ const normalizeChasesResponse = (response: unknown): Chase[] => {
   }
 
   return list
-    .filter((item): item is Partial<Chase> & { id: string } =>
-      Boolean(item && typeof item === 'object' && 'id' in item)
-    )
+    .filter((item): item is ApiHuntRaw => Boolean(item && typeof item === 'object' && 'id' in item))
     .map(normalizeChase);
 };
 
@@ -177,46 +120,53 @@ const buildLocalProgress = (chase: Chase): UserProgress => ({
 });
 
 export const chaseApi = {
-  // GET /hunt — chasses actives (contrat Hunts).
   getChases: async (): Promise<Chase[]> => {
-    const response = await request<unknown>('/hunt');
+    const response = await apiRequest<unknown>('/hunt');
     return normalizeChasesResponse(response);
   },
 
-  // GET /hunt/{id} — la chasse et ses étapes (inline).
+  getManagedChases: async (partnerId?: string): Promise<Chase[]> => {
+    const response = await apiRequest<unknown>('/hunt?all=true');
+    const hunts = normalizeChasesResponse(response);
+    const owned = partnerId ? hunts.filter((chase) => chase.partnerId === partnerId) : hunts;
+    return owned.filter((chase) => chase.status !== 'archived');
+  },
+
+  pauseChase: async (chaseId: string): Promise<Chase> => {
+    return chaseApi.updateChase(chaseId, { status: 'paused' });
+  },
+
+  resumeChase: async (chaseId: string): Promise<Chase> => {
+    return chaseApi.updateChase(chaseId, { status: 'active' });
+  },
+
   getChase: async (chaseId: string): Promise<Chase> => {
-    const chase = await request<Partial<Chase> & { id: string }>(`/hunt/${chaseId}`);
+    const chase = await apiRequest<ApiHuntRaw>(`/hunt/${chaseId}`);
     return normalizeChase(chase);
   },
 
-  // POST /hunt/join {huntId} — rejoindre une chasse active.
   joinHunt: async (huntId: string): Promise<void> => {
-    await request<void>('/hunt/join', {
+    await apiRequest<void>('/hunt/join', {
       method: 'POST',
       body: JSON.stringify({ huntId }),
     });
   },
 
-  // POST /hunt/leave {huntId} — quitter une chasse rejointe.
   leaveHunt: async (huntId: string): Promise<void> => {
-    await request<void>('/hunt/leave', {
+    await apiRequest<void>('/hunt/leave', {
       method: 'POST',
       body: JSON.stringify({ huntId }),
     });
   },
 
-  // GET /hunt/joined — chasses rejointes non terminées.
   getJoinedHunts: async (): Promise<Chase[]> => {
-    const response = await request<unknown>('/hunt/joined');
+    const response = await apiRequest<unknown>('/hunt/joined');
     return normalizeChasesResponse(response);
   },
 
-  // Progression locale (le backend ne suit pas les étapes individuelles).
   getProgress: async (chaseId: string): Promise<UserProgress | null> =>
     localProgressStore.get(chaseId) ?? null,
 
-  // Démarrage : rejoint la chasse via le contrat puis initialise la
-  // progression locale par étape.
   startChase: async (chaseId: string): Promise<UserProgress> => {
     await chaseApi.joinHunt(chaseId);
     const chase = await chaseApi.getChase(chaseId);
@@ -225,7 +175,12 @@ export const chaseApi = {
     return progress;
   },
 
-  completeStep: async (chaseId: string, stepId: string): Promise<ChaseStep> => {
+  completeStep: async (chaseId: string, stepId: string, answer?: string): Promise<ChaseStep> => {
+    await apiRequest(`/hunt/step/complete/${stepId}`, {
+      method: 'POST',
+      body: JSON.stringify({ answer: answer?.trim() || null }),
+    });
+
     const chase = await chaseApi.getChase(chaseId);
     const step = chase.steps.find((item) => item.id === stepId);
     if (!step) {
@@ -243,7 +198,7 @@ export const chaseApi = {
       updated.stepProgress.filter((item) => item.completed).length + 1,
       updated.totalSteps
     );
-    updated.pointsEarned += step.reward ?? 10;
+    updated.pointsEarned += step.points ?? step.reward ?? 10;
     localProgressStore.set(chaseId, updated);
 
     return { ...step, completed: true };
@@ -269,29 +224,36 @@ export const chaseApi = {
     return { pointsEarned: progress?.pointsEarned ?? 0 };
   },
 
-  // POST /hunt — contrat : {title, description, image, partnerId, difficulty,
-  // estimatedDuration, status?, steps[]} (admin/partner). On mappe l'objet
-  // `partner` local vers `partnerId` attendu par l'API.
-  createChase: async (payload: Partial<Chase>): Promise<Chase> => {
-    const { partner, ...rest } = payload;
-    const chase = await request<Partial<Chase> & { id: string }>('/hunt', {
+  createChase: async (form: HuntForm, partnerId?: string): Promise<Chase> => {
+    const chase = await apiRequest<ApiHuntRaw>('/hunt', {
       method: 'POST',
-      body: JSON.stringify({ ...rest, partnerId: partner?.id }),
+      body: JSON.stringify(toCreateHuntPayload(form, partnerId)),
     });
     return normalizeChase(chase);
   },
 
-  // PATCH /hunt/{id} — mise à jour partielle (admin ou propriétaire).
   updateChase: async (chaseId: string, payload: Partial<Chase>): Promise<Chase> => {
-    const chase = await request<Partial<Chase> & { id: string }>(`/hunt/${chaseId}`, {
+    const chase = await apiRequest<ApiHuntRaw>(`/hunt/${chaseId}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
     return normalizeChase(chase);
   },
 
-  // DELETE /hunt/{id} — suppression (admin ou propriétaire).
+  syncHuntSteps: async (huntId: string, steps: HuntStepForm[]): Promise<Chase> => {
+    await apiRequest(`/hunt/${huntId}/steps/sync`, {
+      method: 'PUT',
+      body: JSON.stringify({ steps: steps.map(toApiStep) }),
+    });
+    return chaseApi.getChase(huntId);
+  },
+
+  saveHuntEdit: async (huntId: string, form: HuntForm): Promise<Chase> => {
+    await chaseApi.updateChase(huntId, toUpdateHuntPayload(form));
+    return chaseApi.syncHuntSteps(huntId, form.steps);
+  },
+
   deleteChase: async (chaseId: string): Promise<void> => {
-    await request<void>(`/hunt/${chaseId}`, { method: 'DELETE' });
+    await apiRequest<void>(`/hunt/${chaseId}`, { method: 'DELETE' });
   },
 };

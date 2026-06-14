@@ -36,7 +36,7 @@ type ARExperienceProps = {
   };
   // Combat du gardien avant validation (désactivable pour les tests).
   combatEnabled?: boolean;
-  onComplete?: () => void;
+  onComplete?: (answer?: string) => void;
 };
 
 const PHOTO_CLUE_RADIUS_METERS = 15;
@@ -125,14 +125,14 @@ export function ARExperience({
   // "Photo secrecy" : l'indice photo n'est révélé qu'à moins de 15 m du point.
   const isPhotoClueUnlocked = distanceMeters !== null && distanceMeters <= PHOTO_CLUE_RADIUS_METERS;
 
-  const completeStep = (message: string) => {
+  const completeStep = (message: string, answer?: string) => {
     if (hasLaunched) {
       return;
     }
     chestOpenRef.current = true;
     setHasLaunched(true);
     setValidationMessage(message);
-    onComplete?.();
+    onComplete?.(answer);
   };
 
   const handleValidate = () => {
@@ -152,6 +152,8 @@ export function ARExperience({
     completeStep('Étape validée — le coffre est à toi !');
   };
 
+  const pendingAnswerRef = useRef<string | undefined>(undefined);
+
   const handleBarcodeScanned = (result: BarcodeScanningResult) => {
     if (hasLaunched || showCombat) {
       return;
@@ -163,11 +165,12 @@ export function ARExperience({
     const expected = qrPayload ?? null;
     const matches = expected ? result.data === expected : result.data.startsWith('lootopia:');
     if (matches) {
+      pendingAnswerRef.current = result.data;
       if (combatEnabled) {
         setValidationMessage('QR code reconnu — mais un gardien protège le coffre !');
         setShowCombat(true);
       } else {
-        completeStep('QR code reconnu — étape validée !');
+        completeStep('QR code reconnu — étape validée !', result.data);
       }
     } else {
       setValidationMessage('QR code inconnu pour cette étape.');
@@ -176,7 +179,7 @@ export function ARExperience({
 
   const handleCombatWon = () => {
     setShowCombat(false);
-    completeStep('Gardien vaincu — étape validée, le coffre est à toi !');
+    completeStep('Gardien vaincu — étape validée, le coffre est à toi !', pendingAnswerRef.current);
   };
 
   const playAudioHint = () => {

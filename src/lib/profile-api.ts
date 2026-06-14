@@ -1,6 +1,5 @@
+import { apiRequest } from '@/src/lib/api-client';
 import type { AuthApiError } from '@/src/lib/auth-api';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 /**
  * Contrat Profiles (authentifié, session MFA complète) :
@@ -10,7 +9,6 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
  *                              crédite les points des étapes
  *   DELETE /profile        → suppression du profil
  *   GET    /profile/list   → tous les profils (admin uniquement)
- * Forme alignée sur le type `Profile` du frontend web (src/types/index.ts).
  */
 export type Profile = {
   id: string;
@@ -25,30 +23,8 @@ export type Profile = {
   updatedAt?: string;
 };
 
-const request = async <T,>(token: string, path: string, init: RequestInit = {}) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init.headers || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    const error = new Error(body || 'Request failed') as AuthApiError;
-    error.status = response.status;
-    error.body = body;
-    throw error;
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    return (await response.json()) as T;
-  }
-  return {} as T;
-};
+const request = async <T,>(token: string, path: string, init: RequestInit = {}) =>
+  apiRequest<T>(path, init, token);
 
 export const profileApi = {
   get: (token: string) => request<Profile>(token, '/profile', { method: 'GET' }),
@@ -63,27 +39,23 @@ export const profileApi = {
 
   delete: (token: string) => request<void>(token, '/profile', { method: 'DELETE' }),
 
-  // Admin uniquement (403 pour les autres rôles).
   list: (token: string) => request<Profile[]>(token, '/profile/list', { method: 'GET' }),
 };
 
-/**
- * GET puis POST si le profil n'existe pas encore (404) — idempotent côté
- * appelant. Un 409 sur le POST (course avec une autre session) est rattrapé
- * par un nouveau GET.
- */
 export async function fetchOrCreateProfile(token: string): Promise<Profile> {
   try {
     return await profileApi.get(token);
-  } catch (error: any) {
-    if (error?.status !== 404) {
+  } catch (error: unknown) {
+    const status = (error as AuthApiError)?.status;
+    if (status !== 404) {
       throw error;
     }
   }
   try {
     return await profileApi.create(token);
-  } catch (error: any) {
-    if (error?.status === 409) {
+  } catch (error: unknown) {
+    const status = (error as AuthApiError)?.status;
+    if (status === 409) {
       return profileApi.get(token);
     }
     throw error;

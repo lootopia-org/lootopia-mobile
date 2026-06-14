@@ -1,16 +1,18 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import type { GeoPoint } from '@/src/lib/geo';
+import { liveOpsApi } from '@/src/lib/live-ops-api';
+import { useLiveEventsContext } from '@/src/state/LiveEventsContext';
 
 /**
- * Opérations live de l'organisateur (Emergency Pause / Redirect) :
- * - pause d'une chasse entière ou d'une étape (travaux, danger…)
- * - redirection d'une étape vers un point alternatif
- * Le côté joueur lit cet état : validation bloquée sur étape en pause,
- * cible AR déplacée sur étape redirigée.
- *
- * Prototype : état partagé localement via AsyncStorage (un seul appareil).
- * En production, il transitera par le backend (WebSocket déjà prévu côté web).
+ * Opérations live de l'organisateur (pause d'étape / redirection GPS),
+ * synchronisées via le backend et diffusées en temps réel (WebSocket).
  */
 
 export type StepOverride = {
@@ -19,13 +21,12 @@ export type StepOverride = {
 };
 
 type HuntOps = {
-  huntPaused?: boolean;
   steps: Record<string, StepOverride>;
 };
 
 type LiveOpsContextValue = {
   ops: Record<string, HuntOps>;
-  setHuntLivePaused: (huntId: string, paused: boolean) => Promise<void>;
+  syncFromServer: (huntId: string) => Promise<void>;
   setStepPaused: (huntId: string, stepId: string, paused: boolean) => Promise<void>;
   setStepRedirect: (huntId: string, stepId: string, location: GeoPoint, note?: string) => Promise<void>;
   clearStepRedirect: (huntId: string, stepId: string) => Promise<void>;
@@ -33,53 +34,98 @@ type LiveOpsContextValue = {
   isHuntLivePaused: (huntId: string) => boolean;
 };
 
-const STORAGE_KEY = 'lootopia-mobile-liveops';
-
 const LiveOpsContext = createContext<LiveOpsContextValue | undefined>(undefined);
+
+const mapServerSteps = (steps: Record<string, { paused?: boolean; redirect?: GeoPoint & { note?: string } }>) => {
+  const mapped: Record<string, StepOverride> = {};
+  for (const [stepId, override] of Object.entries(steps)) {
+    mapped[stepId] = {
+      paused: override.paused,
+      redirect: override.redirect
+        ? {
+            location: {
+              latitude: override.redirect.latitude,
+              longitude: override.redirect.longitude,
+            },
+            note: override.redirect.note,
+          }
+        : undefined,
+    };
+  }
+  return mapped;
+};
 
 export function LiveOpsProvider({ children }: { children: React.ReactNode }) {
   const [ops, setOps] = useState<Record<string, HuntOps>>({});
+  const { subscribeHuntEvents } = useLiveEventsContext();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          setOps(JSON.parse(stored) as Record<string, HuntOps>);
-        }
-      } catch {
-        // état corrompu : on repart à vide
-      }
-    })();
+  const applyHuntOps = useCallback((huntId: string, steps: Record<string, StepOverride>) => {
+    setOps((current) => ({ ...current, [huntId]: { steps } }));
   }, []);
 
-  const persist = async (next: Record<string, HuntOps>) => {
-    setOps(next);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  };
+  const syncFromServer = useCallback(
+    async (huntId: string) => {
+      try {
+        const remote = await liveOpsApi.getForHunt(huntId);
+        applyHuntOps(huntId, mapServerSteps(remote.steps));
+      } catch {
+        // best-effort : on garde le cache local
+      }
+    },
+    [applyHuntOps]
+  );
 
-  const updateStep = async (huntId: string, stepId: string, patch: Partial<StepOverride>) => {
-    const hunt = ops[huntId] ?? { steps: {} };
-    const step = { ...(hunt.steps[stepId] ?? {}), ...patch };
-    await persist({ ...ops, [huntId]: { ...hunt, steps: { ...hunt.steps, [stepId]: step } } });
-  };
+  useEffect(
+    () =>
+      subscribeHuntEvents((event) => {
+        if (event.eventType !== 'hunt_steps.live_ops_updated') {
+          return;
+        }
+        const payload = event.payload as { huntId?: string } | undefined;
+        if (payload?.huntId) {
+          void syncFromServer(payload.huntId);
+        }
+      }),
+    [subscribeHuntEvents, syncFromServer]
+  );
+
+  const setStepPaused = useCallback(
+    async (huntId: string, stepId: string, paused: boolean) => {
+      const remote = await liveOpsApi.updateStep(huntId, stepId, { paused });
+      applyHuntOps(huntId, mapServerSteps(remote.steps));
+    },
+    [applyHuntOps]
+  );
+
+  const setStepRedirect = useCallback(
+    async (huntId: string, stepId: string, location: GeoPoint, note?: string) => {
+      const remote = await liveOpsApi.updateStep(huntId, stepId, {
+        redirect: { ...location, note },
+      });
+      applyHuntOps(huntId, mapServerSteps(remote.steps));
+    },
+    [applyHuntOps]
+  );
+
+  const clearStepRedirect = useCallback(
+    async (huntId: string, stepId: string) => {
+      const remote = await liveOpsApi.updateStep(huntId, stepId, { clearRedirect: true });
+      applyHuntOps(huntId, mapServerSteps(remote.steps));
+    },
+    [applyHuntOps]
+  );
 
   const value = useMemo<LiveOpsContextValue>(
     () => ({
       ops,
-      setHuntLivePaused: async (huntId, paused) => {
-        const hunt = ops[huntId] ?? { steps: {} };
-        await persist({ ...ops, [huntId]: { ...hunt, huntPaused: paused } });
-      },
-      setStepPaused: (huntId, stepId, paused) => updateStep(huntId, stepId, { paused }),
-      setStepRedirect: (huntId, stepId, location, note) =>
-        updateStep(huntId, stepId, { redirect: { location, note } }),
-      clearStepRedirect: (huntId, stepId) => updateStep(huntId, stepId, { redirect: undefined }),
+      syncFromServer,
+      setStepPaused,
+      setStepRedirect,
+      clearStepRedirect,
       getStepOverride: (huntId, stepId) => ops[huntId]?.steps[stepId],
-      isHuntLivePaused: (huntId) => Boolean(ops[huntId]?.huntPaused),
+      isHuntLivePaused: () => false,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ops]
+    [ops, syncFromServer, setStepPaused, setStepRedirect, clearStepRedirect]
   );
 
   return <LiveOpsContext.Provider value={value}>{children}</LiveOpsContext.Provider>;
@@ -88,7 +134,7 @@ export function LiveOpsProvider({ children }: { children: React.ReactNode }) {
 export function useLiveOps() {
   const context = useContext(LiveOpsContext);
   if (!context) {
-    throw new Error('useLiveOps doit être utilisé dans un LiveOpsProvider');
+    throw new Error('useLiveOps must be used within LiveOpsProvider');
   }
   return context;
 }
