@@ -27,6 +27,6 @@ export async function uploadStepImage(localUri: string): Promise<string> {
     throw new Error(body || `Upload échoué (${response.status})`);
   }
 
-  const data = (await response.json()) as { url: string };
-  return data.url;
+  const data = (await response.json()) as { url: string; key?: string };
+  return data.key ?? data.url;
 }

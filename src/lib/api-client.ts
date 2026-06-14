@@ -38,6 +38,7 @@ export async function apiRequest<T>(
 
   if (token) {
     Object.assign(headers, sessionCookieHeader(token));
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {

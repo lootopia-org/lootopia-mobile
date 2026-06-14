@@ -30,6 +30,7 @@ export type HuntStepForm = {
   description: string;
   type: HuntStepType;
   answer?: string;
+  scanInAr?: boolean;
   latitude: string;
   longitude: string;
   points: number;

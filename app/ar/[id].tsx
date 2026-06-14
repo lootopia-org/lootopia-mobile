@@ -94,7 +94,7 @@ export default function ARScreen() {
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common:errors.saveFailed');
       setError(message);
-      Alert.alert(t('common:errors.operationFailed'), message);
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -136,6 +136,17 @@ export default function ARScreen() {
     );
   }
 
+  if (stepType === 'qr_code' && !step.scanInAr) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.notFoundText}>{t('hunts:qrScan.useStandardScanner')}</Text>
+        <Pressable style={styles.backLink} onPress={() => router.back()}>
+          <Text style={styles.backLinkText}>{t('common:back')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   const stepLocation = step.location;
   const liveOverride = {
     huntPaused: chase.status === 'paused',
@@ -155,23 +166,32 @@ export default function ARScreen() {
     }
 
     if (stepType === 'photo') {
-      return <StepPhotoCapture description={step.description} onSubmit={(url) => finishStep(url)} />;
+      return (
+        <StepPhotoCapture
+          description={step.description}
+          referencePhotoUrl={step.photoClueUri ?? step.answer}
+          onSubmit={(url) => finishStep(url)}
+        />
+      );
     }
+
+    const isQrStep = stepType === 'qr_code';
+    const isChestStep = stepType === 'ar' || stepType === 'checkpoint';
 
     return (
       <ARExperience
         clue={step.description}
         targetLocation={stepLocation}
         radiusMeters={step.radiusMeters ?? 30}
-        qrPayload={stepType === 'qr_code' ? step.answer : step.qrPayload}
+        accessCode={isChestStep ? step.answer : undefined}
+        qrPayload={isQrStep ? step.answer : step.qrPayload}
+        qrRevealContent={isQrStep ? step.answer : undefined}
+        requireQrScan={isQrStep}
         photoClueUri={step.photoClueUri}
         audioHintUri={step.audioHintUri}
         liveOverride={liveOverride}
         fullScreen
-        combatEnabled={stepType === 'ar'}
-        onComplete={(answer) => {
-          void finishStep(answer);
-        }}
+        onComplete={(answer) => finishStep(answer)}
       />
     );
   };

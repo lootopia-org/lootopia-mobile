@@ -10,14 +10,16 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useTranslation } from 'react-i18next';
+import { StoredImage } from '@/src/components/StoredImage';
 import { colors, glassCard, radii } from '@/src/theme';
 
 type Props = {
   description: string;
+  referencePhotoUrl?: string;
   onSubmit: (photoData: string) => Promise<void>;
 };
 
-export function StepPhotoCapture({ description, onSubmit }: Props) {
+export function StepPhotoCapture({ description, referencePhotoUrl, onSubmit }: Props) {
   const { t } = useTranslation(['hunts', 'common']);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
@@ -76,6 +78,13 @@ export function StepPhotoCapture({ description, onSubmit }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.description}>{description}</Text>
+      {referencePhotoUrl ? (
+        <View style={styles.referenceBlock}>
+          <Text style={styles.referenceLabel}>{t('hunts:stepPhoto.referenceLabel')}</Text>
+          <StoredImage storedUrl={referencePhotoUrl} style={styles.referenceImage} resizeMode="contain" />
+          <Text style={styles.referenceHint}>{t('hunts:stepPhoto.referenceHint')}</Text>
+        </View>
+      ) : null}
       {previewUri ? <Image source={{ uri: previewUri }} style={styles.preview} /> : null}
       {!done && (
         <Pressable style={styles.button} onPress={() => void openCamera()} disabled={submitting}>
@@ -114,6 +123,17 @@ export function StepPhotoCapture({ description, onSubmit }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, justifyContent: 'center' },
   description: { color: colors.foreground, fontSize: 16, lineHeight: 24, marginBottom: 20 },
+  referenceBlock: {
+    marginBottom: 16,
+    borderColor: colors.gold,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+    backgroundColor: colors.goldSoft,
+    padding: 12,
+  },
+  referenceLabel: { color: colors.gold, fontWeight: '900', fontSize: 12, marginBottom: 8 },
+  referenceImage: { width: '100%', height: 180, borderRadius: radii.md, backgroundColor: colors.background },
+  referenceHint: { color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 18 },
   preview: { width: '100%', height: 200, borderRadius: radii.lg, marginBottom: 16 },
   button: {
     backgroundColor: colors.teal,

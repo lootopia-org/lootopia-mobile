@@ -128,6 +128,10 @@
     "photo": "Take photo",
     "default": "Start"
   },
+  "qrScan": {
+    "helper": "Point the camera at the QR code for this step.",
+    "useStandardScanner": "Open this step from the hunt detail screen to scan the QR code."
+  },
   "liveEvents": {
     "huntSuspendedTitle": "Hunt suspended"
   },
@@ -156,12 +160,18 @@
       "cta": "Browse hunts"
     }
   },
+  "completedList": {
+    "heading": "Completed hunts",
+    "empty": "No completed hunts yet — finish a hunt to see it here.",
+    "viewHunt": "View hunt"
+  },
   "detail": {
     "signInPrompt": "Sign in to view hunt details.",
     "signIn": "Sign in",
     "notFound": "Hunt not found or unavailable.",
     "backToCatalog": "Back to catalog",
     "bannerInProgress": "In progress",
+    "bannerCompleted": "Completed",
     "primaryAction": {
       "launch": "Launch",
       "continue": "Continue"
@@ -385,6 +395,36 @@
       "geoUnavailable": "Geolocation unavailable"
     },
     "helperDefault": "Get closer to the point — or scan the step QR code with the camera.",
+    "helperScanQr": "Point the camera at the step QR code to validate.",
+    "helperScanDisplayedQr": "Scan the QR code shown on screen with your camera to validate.",
+    "helperScanPhysicalQr": "Find the partner's printed QR mark and scan it to unlock the secret.",
+    "helperNear": "You're close — validating the step…",
+    "qrOverlay": {
+      "kicker": "QR CODE",
+      "title": "Scan this code",
+      "label": "Step QR code",
+      "locked": "Secret locked",
+      "physicalHint": "Scan the printed QR code placed at this location"
+    },
+    "qrScan": {
+      "button": "Scan QR code",
+      "cancel": "Cancel scan"
+    },
+    "qrReveal": {
+      "kicker": "SECRET UNLOCKED",
+      "title": "Hidden message",
+      "continue": "Claim reward"
+    },
+    "accessCode": {
+      "kicker": "TREASURE LOCK",
+      "title": "Enter access code",
+      "placeholder": "Access code",
+      "unlock": "Unlock chest",
+      "incorrect": "Incorrect code — try again.",
+      "unlocked": "Code accepted — the chest awaits!"
+    },
+    "helperTapScan": "Tap Scan to read the QR code and reveal the secret.",
+    "helperScanning": "Aim at the QR code…",
     "validateButton": {
       "validated": "Step validated ✓",
       "ready": "Validate step",
@@ -461,6 +501,8 @@
     "errorIncorrect": "Incorrect answer"
   },
   "stepPhoto": {
+    "referenceLabel": "Reference photo",
+    "referenceHint": "Take a matching photo of this clue on site.",
     "takePhoto": "Take a photo",
     "retake": "Retake",
     "send": "Send",

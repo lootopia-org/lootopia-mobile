@@ -128,6 +128,10 @@
     "photo": "Photographier",
     "default": "Commencer"
   },
+  "qrScan": {
+    "helper": "Vise le QR code de cette étape avec la caméra.",
+    "useStandardScanner": "Ouvre cette étape depuis le détail de la chasse pour scanner le QR code."
+  },
   "liveEvents": {
     "huntSuspendedTitle": "Chasse suspendue"
   },
@@ -156,12 +160,18 @@
       "cta": "Voir les chasses"
     }
   },
+  "completedList": {
+    "heading": "Chasses terminées",
+    "empty": "Aucune chasse terminée — finissez une chasse pour la retrouver ici.",
+    "viewHunt": "Voir la chasse"
+  },
   "detail": {
     "signInPrompt": "Connectez-vous pour voir les détails de la chasse.",
     "signIn": "Se connecter",
     "notFound": "Chasse introuvable ou indisponible.",
     "backToCatalog": "Retour au catalogue",
     "bannerInProgress": "En cours",
+    "bannerCompleted": "Terminée",
     "primaryAction": {
       "launch": "Lancer",
       "continue": "Continuer"
@@ -385,6 +395,36 @@
       "geoUnavailable": "Géolocalisation indisponible"
     },
     "helperDefault": "Approche-toi du point — ou scanne le QR code de l’étape avec la caméra.",
+    "helperScanQr": "Vise le QR code de l’étape avec la caméra pour valider.",
+    "helperScanDisplayedQr": "Scanne le QR code affiché à l’écran avec ta caméra pour valider.",
+    "helperScanPhysicalQr": "Trouve le QR imprimé par l’organisateur et scanne-le pour révéler le secret.",
+    "helperNear": "Tu es proche — validation de l’étape…",
+    "qrOverlay": {
+      "kicker": "QR CODE",
+      "title": "Scanne ce code",
+      "label": "QR code de l’étape",
+      "locked": "Secret verrouillé",
+      "physicalHint": "Scanne le QR code imprimé sur place"
+    },
+    "qrScan": {
+      "button": "Scanner le QR",
+      "cancel": "Annuler le scan"
+    },
+    "qrReveal": {
+      "kicker": "SECRET DÉVOILÉ",
+      "title": "Message caché",
+      "continue": "Récupérer la récompense"
+    },
+    "accessCode": {
+      "kicker": "COFFRE VERROUILLÉ",
+      "title": "Entre le code d’accès",
+      "placeholder": "Code d’accès",
+      "unlock": "Déverrouiller le coffre",
+      "incorrect": "Code incorrect — réessaie.",
+      "unlocked": "Code accepté — le coffre t’attend !"
+    },
+    "helperTapScan": "Appuie sur Scanner pour lire le QR et révéler le secret.",
+    "helperScanning": "Vise le QR code…",
     "validateButton": {
       "validated": "Étape validée ✓",
       "ready": "Valider l’étape",
@@ -461,6 +501,8 @@
     "errorIncorrect": "Réponse incorrecte"
   },
   "stepPhoto": {
+    "referenceLabel": "Photo de référence",
+    "referenceHint": "Reproduisez cette scène sur place avec votre photo.",
     "takePhoto": "Prendre une photo",
     "retake": "Reprendre",
     "send": "Envoyer",

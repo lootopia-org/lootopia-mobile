@@ -11,8 +11,7 @@ import { usePlayerProfile } from '@/src/hooks/usePlayerProfile';
 import { profileApi } from '@/src/lib/profile-api';
 import { setAppLocale, type AppLocale } from '@/src/i18n';
 import { colors, glassCard, glassStrongCard, radii } from '@/src/theme';
-
-const XP_TARGET = 2000;
+import { getLevelProgress, POINTS_PER_LEVEL } from '@/src/lib/level-progress';
 
 export default function AccountScreen() {
   const router = useRouter();
@@ -20,7 +19,7 @@ export default function AccountScreen() {
   const { t, i18n } = useTranslation(['common']);
   const { user, signOut, token } = useAuth();
   const { avatarModel, setAvatarModel, acceptedHunts } = useHunts();
-  const { profile, points, level, completedHunts, refreshProfile } = usePlayerProfile();
+  const { profile, points, completedHunts, refreshProfile } = usePlayerProfile();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const realToken = token;
@@ -50,7 +49,8 @@ export default function AccountScreen() {
     await setAppLocale(locale);
   };
 
-  const xpRatio = Math.min(points / XP_TARGET, 1);
+  const levelProgress = getLevelProgress(points);
+  const xpRatio = levelProgress.ratio;
   const currentLocale = i18n.language.startsWith('fr') ? 'fr' : 'en';
 
   return (
@@ -84,9 +84,12 @@ export default function AccountScreen() {
 
       <View style={styles.levelCard}>
         <View style={styles.levelRow}>
-          <Text style={styles.levelText}>{t('common:account.level', { level })}</Text>
+          <Text style={styles.levelText}>{t('common:account.level', { level: levelProgress.displayLevel })}</Text>
           <Text style={styles.xpText}>
-            {t('common:account.xpProgress', { points, target: XP_TARGET })}
+            {t('common:account.xpProgress', {
+              points: levelProgress.pointsIntoLevel,
+              target: POINTS_PER_LEVEL,
+            })}
             {profile ? '' : ` · ${t('common:offline')}`}
           </Text>
         </View>

@@ -16,7 +16,9 @@ import { bearingDegrees, formatDistance, haversineDistanceMeters, smoothPosition
 import { getFps } from '@/src/lib/perf';
 import { recordBreadcrumb } from '@/src/lib/heatmap';
 import { huntJoinErrorMessage } from '@/src/lib/hunt-join-errors';
+import { useCatalogHuntEvents } from '@/src/hooks/use-catalog-hunt-events';
 import { usePlayerProfile } from '@/src/hooks/usePlayerProfile';
+import { getLevelProgress, POINTS_PER_LEVEL } from '@/src/lib/level-progress';
 
 // Région initiale de la carte tant que le GPS n'a pas fourni de position.
 const FALLBACK_POSITION: GeoPoint = { latitude: 37.8044, longitude: -122.2712 };
@@ -41,12 +43,14 @@ export default function MapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation(['common', 'hunts']);
-  const { avatarModel, acceptHunt, abandonHunt, isAccepted, canPlayHunts, refreshFromServer } = useHunts();
+  const { avatarModel, acceptHunt, abandonHunt, isAccepted, isCompleted, canPlayHunts, refreshFromServer, acceptedHunts } = useHunts();
   // Niveau/points réels du joueur (GET /profile).
-  const { level, points } = usePlayerProfile();
+  const { points } = usePlayerProfile();
+  const levelProgress = getLevelProgress(points);
 
   const mapRef = useRef<MapView>(null);
   const [hunts, setHunts] = useState<Chase[]>([]);
+  const [joinedHunts, setJoinedHunts] = useState<Chase[]>([]);
   const [position, setPosition] = useState<GeoPoint | null>(null);
   const [walking, setWalking] = useState(false);
   const [heading, setHeading] = useState<number | null>(null);
@@ -96,6 +100,14 @@ export default function MapScreen() {
   const proximityTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Chargement des chasses (API ; liste vide en cas d'erreur réseau).
+  const loadJoinedHunts = useCallback(() => {
+    if (!canPlayHunts) {
+      setJoinedHunts([]);
+      return;
+    }
+    chaseApi.getJoinedHunts().then(setJoinedHunts).catch(() => setJoinedHunts([]));
+  }, [canPlayHunts]);
+
   const huntsRef = useRef<Chase[]>([]);
   const loadHunts = useCallback(() => {
     chaseApi.getChases().then(setHunts).catch(() => setHunts([]));
@@ -103,6 +115,10 @@ export default function MapScreen() {
   useEffect(() => {
     loadHunts();
   }, [loadHunts]);
+  useCatalogHuntEvents(loadHunts);
+  useEffect(() => {
+    loadJoinedHunts();
+  }, [loadJoinedHunts]);
   useEffect(() => {
     huntsRef.current = hunts;
   }, [hunts]);
@@ -171,6 +187,7 @@ export default function MapScreen() {
   useFocusEffect(
     useCallback(() => {
       loadHunts();
+      loadJoinedHunts();
       if (canPlayHunts) {
         void refreshFromServer();
       }
@@ -196,20 +213,35 @@ export default function MapScreen() {
           clearTimeout(walkingTimeout.current);
         }
       };
-    }, [canPlayHunts, loadHunts, refreshFromServer, subscribeGps])
+    }, [canPlayHunts, loadHunts, loadJoinedHunts, refreshFromServer, subscribeGps])
   );
+
+  const stepMarkers = useMemo(() => {
+    return joinedHunts.flatMap((hunt) => {
+      if (!isAccepted(hunt.id)) {
+        return [];
+      }
+      const completedIds = acceptedHunts[hunt.id]?.completedStepIds ?? [];
+      return hunt.steps
+        .filter((step) => step.location && (step.location.latitude !== 0 || step.location.longitude !== 0))
+        .map((step) => ({
+          hunt,
+          step,
+          completed: completedIds.includes(step.id),
+        }));
+    });
+  }, [joinedHunts, isAccepted, acceptedHunts]);
 
   const huntsWithDistance = useMemo(
     () =>
       hunts
-        // Garde : le backend peut renvoyer des chasses sans coordonnées
-        // (normalisées à 0,0) — on ne les affiche pas sur la carte.
+        .filter((hunt) => !isCompleted(hunt.id))
         .filter((hunt) => hunt.location.latitude !== 0 || hunt.location.longitude !== 0)
         .map((hunt) => ({
           hunt,
           distance: position ? haversineDistanceMeters(position, hunt.location) : null,
         })),
-    [hunts, position]
+    [hunts, position, isCompleted]
   );
 
   // Alerte de proximité in-app : prévenir (une seule fois par chasse) quand une
@@ -247,7 +279,9 @@ export default function MapScreen() {
   );
 
   const openSheet = (hunt: Chase) => {
-    setSelectedHunt(hunt);
+    const fullHunt =
+      isAccepted(hunt.id) ? joinedHunts.find((item) => item.id === hunt.id) ?? hunt : hunt;
+    setSelectedHunt(fullHunt);
     Animated.spring(sheetAnim, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 6 }).start();
   };
 
@@ -332,6 +366,21 @@ export default function MapScreen() {
             </View>
           </Marker>
         ))}
+
+        {stepMarkers.map(({ hunt, step, completed }) => (
+          <Marker
+            key={`${hunt.id}-${step.id}`}
+            coordinate={step.location!}
+            onPress={() => openSheet(hunt)}
+            tracksViewChanges={false}
+          >
+            <View style={[styles.stepMarker, completed && styles.stepMarkerCompleted]}>
+              <Text style={[styles.stepMarkerText, completed && styles.stepMarkerTextCompleted]}>
+                {step.order}
+              </Text>
+            </View>
+          </Marker>
+        ))}
       </MapView>
 
       {/* Mode suivi : personnage 3D fixe au centre, la carte défile sous lui. */}
@@ -376,8 +425,19 @@ export default function MapScreen() {
 
       {/* HUD niveau / points */}
       <View style={[styles.hud, { top: insets.top + 10 }]}>
-        <View style={styles.hudPill}>
-          <Text style={styles.hudGold}>{t('common:account.levelShort', { level })}</Text>
+        <View style={styles.hudColumn}>
+          <View style={styles.hudPill}>
+            <Text style={styles.hudGold}>{t('common:account.levelShort', { level: levelProgress.displayLevel })}</Text>
+          </View>
+          <View style={styles.hudXpTrack}>
+            <View style={[styles.hudXpFill, { width: `${Math.round(levelProgress.ratio * 100)}%` }]} />
+          </View>
+          <Text style={styles.hudXpText}>
+            {t('common:account.xpProgress', {
+              points: levelProgress.pointsIntoLevel,
+              target: POINTS_PER_LEVEL,
+            })}
+          </Text>
         </View>
         <View style={styles.hudPill}>
           <Text style={styles.hudTeal}>{t('common:account.stats.pointsHud', { points })}</Text>
@@ -427,7 +487,18 @@ export default function MapScreen() {
           <Text style={styles.sheetDescription} numberOfLines={3}>
             {selectedHunt.description}
           </Text>
-          {isAccepted(selectedHunt.id) ? (
+          {isAccepted(selectedHunt.id) && selectedHunt.steps.some((step) => step.location) ? (
+            <Text style={styles.sheetStepsHint}>
+              {t('common:map.sheet.stepsOnMap', {
+                count: selectedHunt.steps.filter((step) => step.location).length,
+              })}
+            </Text>
+          ) : null}
+          {isCompleted(selectedHunt.id) ? (
+            <Pressable style={[styles.cta, styles.ctaAccepted]} onPress={() => router.push(`/chases/${selectedHunt.id}`)}>
+              <Text style={styles.ctaAcceptedText}>{t('hunts:completedList.viewHunt')}</Text>
+            </Pressable>
+          ) : isAccepted(selectedHunt.id) ? (
             <View style={styles.sheetActions}>
               <Pressable
                 style={[styles.cta, styles.ctaAccepted]}
@@ -473,8 +544,12 @@ const styles = StyleSheet.create({
     // Décale légèrement vers le haut : les pieds du personnage "touchent" la position GPS.
     paddingBottom: 64,
   },
-  hud: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', justifyContent: 'space-between' },
-  hudPill: { ...glassStrongCard, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: 'rgba(11,15,26,0.82)' },
+  hud: { position: 'absolute', left: 14, right: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
+  hudColumn: { flex: 1, gap: 4 },
+  hudPill: { ...glassStrongCard, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: 'rgba(11,15,26,0.82)', alignSelf: 'flex-start' },
+  hudXpTrack: { height: 4, borderRadius: radii.pill, backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, overflow: 'hidden', width: '100%' },
+  hudXpFill: { height: '100%', backgroundColor: colors.gold },
+  hudXpText: { color: colors.textMuted, fontWeight: '700', fontSize: 10 },
   hudGold: { color: colors.gold, fontWeight: '800', fontSize: 13 },
   hudTeal: { color: colors.teal, fontWeight: '800', fontSize: 13 },
   banner: { position: 'absolute', left: 14, right: 14, backgroundColor: 'rgba(11,15,26,0.92)', borderColor: colors.danger, borderWidth: 1, borderRadius: radii.md, padding: 10 },
@@ -486,6 +561,22 @@ const styles = StyleSheet.create({
   huntMarkerIcon: { fontSize: 30, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   huntMarkerBadge: { backgroundColor: 'rgba(11,15,26,0.9)', borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 7, paddingVertical: 2, marginTop: 2 },
   huntMarkerBadgeText: { color: colors.foreground, fontSize: 9, fontWeight: '800' },
+  stepMarker: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.teal,
+    borderColor: colors.foreground,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepMarkerCompleted: {
+    backgroundColor: colors.glass,
+    borderColor: colors.textMuted,
+  },
+  stepMarkerText: { color: colors.background, fontWeight: '900', fontSize: 12 },
+  stepMarkerTextCompleted: { color: colors.textMuted },
   mapControls: { position: 'absolute', right: 14, alignItems: 'flex-end', gap: 10 },
   mapControlButton: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(11,15,26,0.88)', borderColor: colors.glassBorderStrong, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   mapControlButtonActive: { backgroundColor: colors.gold, borderColor: colors.gold },
@@ -501,6 +592,7 @@ const styles = StyleSheet.create({
   chip: { borderColor: colors.glassBorderStrong, borderWidth: 1, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.glass },
   chipText: { color: colors.foreground, fontSize: 11, fontWeight: '700' },
   sheetDescription: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  sheetStepsHint: { color: colors.teal, fontSize: 12, fontWeight: '700', marginBottom: 12 },
   sheetActions: { gap: 10 },
   cta: { backgroundColor: colors.gold, borderRadius: radii.md, alignItems: 'center', paddingVertical: 13 },
   ctaText: { color: colors.background, fontWeight: '900', fontSize: 15 },

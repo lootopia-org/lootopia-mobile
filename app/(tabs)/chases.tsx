@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
 import { huntJoinErrorMessage } from '@/src/lib/hunt-join-errors';
+import { useCatalogHuntEvents } from '@/src/hooks/use-catalog-hunt-events';
 import { useHunts } from '@/src/state/HuntsContext';
 import { colors, glassCard, radii } from '@/src/theme';
 import { formatDistance, haversineDistanceMeters, type GeoPoint } from '@/src/lib/geo';
@@ -15,7 +16,7 @@ export default function ChasesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation(['hunts', 'common']);
-  const { isAccepted, acceptHunt, abandonHunt, canPlayHunts, refreshFromServer } = useHunts();
+  const { isAccepted, isCompleted, acceptHunt, abandonHunt, canPlayHunts, refreshFromServer } = useHunts();
   const [chases, setChases] = useState<Chase[]>([]);
   const [position, setPosition] = useState<GeoPoint | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,6 +48,8 @@ export default function ChasesScreen() {
     }, [loadChases])
   );
 
+  useCatalogHuntEvents(loadChases);
+
   useEffect(() => {
     (async () => {
       const permission = await Location.getForegroundPermissionsAsync();
@@ -72,13 +75,14 @@ export default function ChasesScreen() {
           haversineDistanceMeters(position, a.location) - haversineDistanceMeters(position, b.location)
       )
     : chases;
+  const available = sorted.filter((chase) => !isCompleted(chase.id));
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
       <Text style={styles.header}>{t('hunts:catalog.pageHeading')}</Text>
       {error && <Text style={styles.error}>{error}</Text>}
       <FlatList
-        data={sorted}
+        data={available}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 24, gap: 14 }}
         renderItem={({ item }) => {

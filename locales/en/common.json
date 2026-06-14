@@ -193,6 +193,7 @@
     "map": "Map",
     "available": "Available",
     "inProgress": "In progress",
+    "completed": "Completed",
     "field": "Field",
     "profile": "Profile"
   },
@@ -295,7 +296,8 @@
       "rewardChip": "🏆 {points} pts",
       "distanceChip": "📍 {distance}",
       "acceptCta": "Accept hunt",
-      "acceptedCta": "In progress ✓ — view details"
+      "acceptedCta": "In progress ✓ — view details",
+      "stepsOnMap": "{count} step locations shown on the map"
     },
     "chaseMap": {
       "markerTitle": "Hunt zone",

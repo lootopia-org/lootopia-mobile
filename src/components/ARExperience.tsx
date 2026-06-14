@@ -1,7 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import { StoredImage } from '@/src/components/StoredImage';
+import { ArSecretReveal } from '@/src/components/ar/ArSecretReveal';
+import { qrPayloadsMatch } from '@/src/lib/qr-utils';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useAudioPlayer } from 'expo-audio';
 import * as Location from 'expo-location';
@@ -13,7 +24,6 @@ import { haversineDistanceMeters } from '@/src/lib/geo';
 import { buildChest } from '@/src/components/three/buildCharacter';
 import { createFrameLimiter, useAppActiveRef } from '@/src/hooks/useAppActiveRef';
 import { recordFrame } from '@/src/lib/perf';
-import { CombatModal } from '@/src/components/CombatModal';
 
 type ARExperienceProps = {
   clue: string;
@@ -22,7 +32,10 @@ type ARExperienceProps = {
     longitude: number;
   };
   radiusMeters: number;
+  accessCode?: string;
   qrPayload?: string;
+  qrRevealContent?: string;
+  requireQrScan?: boolean;
   fullScreen?: boolean;
   photoClueUri?: string;
   audioHintUri?: string;
@@ -31,39 +44,67 @@ type ARExperienceProps = {
     stepPaused?: boolean;
     redirect?: { location: { latitude: number; longitude: number }; note?: string };
   };
-  combatEnabled?: boolean;
-  onComplete?: (answer?: string) => void;
+  onComplete?: (answer?: string) => void | Promise<void>;
 };
 
 const PHOTO_CLUE_RADIUS_METERS = 15;
+
+type ArPhase = 'access_code' | 'active' | 'qr_display' | 'qr_scanning' | 'qr_revealed' | 'completed';
+
+function normalizeCode(value: string): string {
+  return value.trim().toLowerCase();
+}
 
 export function ARExperience({
   clue,
   targetLocation,
   radiusMeters,
+  accessCode,
   qrPayload,
+  qrRevealContent,
+  requireQrScan = false,
   fullScreen = false,
   photoClueUri,
   audioHintUri,
   liveOverride,
-  combatEnabled = true,
   onComplete,
 }: ARExperienceProps) {
   const { t } = useTranslation('hunts');
   const [permission, requestPermission] = useCameraPermissions();
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [hasLaunched, setHasLaunched] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
-  const [showCombat, setShowCombat] = useState(false);
-  const audioPlayer = useAudioPlayer(audioHintUri ?? null);
+  const [codeInput, setCodeInput] = useState('');
+  const [codeError, setCodeError] = useState('');
+  const [scannedPayload, setScannedPayload] = useState<string | null>(null);
+
+  const showQrMode = requireQrScan && !!qrPayload?.trim();
+  const requiredCode = accessCode?.trim() || undefined;
+
+  const [phase, setPhase] = useState<ArPhase>(() => {
+    if (requireQrScan && qrPayload?.trim()) {
+      return 'qr_display';
+    }
+    if (accessCode?.trim()) {
+      return 'access_code';
+    }
+    return 'active';
+  });
+
+  const qrPulse = useRef(new Animated.Value(1)).current;
+  const scanLine = useRef(new Animated.Value(0)).current;
 
   const effectiveTarget = liveOverride?.redirect?.location ?? targetLocation;
   const isLiveBlocked = Boolean(liveOverride?.huntPaused || liveOverride?.stepPaused);
+  const chestUnlocked = phase === 'active' || phase === 'completed';
+  const hasLaunched = phase === 'completed';
 
   const chestOpenRef = useRef(false);
   const frameRef = useRef<number | null>(null);
   const appActiveRef = useAppActiveRef();
+  const proximityCompletedRef = useRef(false);
+  const lastScanAtRef = useRef(0);
+  const unlockedAnswerRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!permission) {
@@ -98,6 +139,35 @@ export function ARExperience({
     []
   );
 
+  useEffect(() => {
+    if (phase !== 'qr_display') {
+      return;
+    }
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(qrPulse, { toValue: 1.04, duration: 900, useNativeDriver: true }),
+        Animated.timing(qrPulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [phase, qrPulse]);
+
+  useEffect(() => {
+    if (phase !== 'qr_scanning') {
+      return;
+    }
+    scanLine.setValue(0);
+    const sweep = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanLine, { toValue: 1, duration: 1800, useNativeDriver: true }),
+        Animated.timing(scanLine, { toValue: 0, duration: 1800, useNativeDriver: true }),
+      ])
+    );
+    sweep.start();
+    return () => sweep.stop();
+  }, [phase, scanLine]);
+
   const distanceMeters = useMemo(() => {
     if (!currentLocation) {
       return null;
@@ -106,63 +176,89 @@ export function ARExperience({
   }, [currentLocation, effectiveTarget]);
 
   const isWithinRange = distanceMeters !== null && distanceMeters <= radiusMeters;
-  const isReadyToValidate = isWithinRange && !isLiveBlocked;
   const isPhotoClueUnlocked = distanceMeters !== null && distanceMeters <= PHOTO_CLUE_RADIUS_METERS;
+  const audioPlayer = useAudioPlayer(audioHintUri ?? null);
 
-  const completeStep = (message: string, answer?: string) => {
-    if (hasLaunched) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const completeStep = async (message: string, answer?: string) => {
+    if (phase === 'completed' || isSubmitting) {
       return;
     }
-    chestOpenRef.current = true;
-    setHasLaunched(true);
-    setValidationMessage(message);
-    onComplete?.(answer);
+    setIsSubmitting(true);
+    try {
+      await onComplete?.(answer);
+      chestOpenRef.current = true;
+      setPhase('completed');
+      setValidationMessage(message);
+    } catch (err) {
+      proximityCompletedRef.current = false;
+      if (unlockedAnswerRef.current) {
+        setValidationMessage(t('ar.accessCode.incorrect'));
+      } else if (err instanceof Error && err.message) {
+        setValidationMessage(err.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleValidate = () => {
-    if (isLiveBlocked) {
-      setValidationMessage(t('ar.messages.stepSuspended'));
+  useEffect(() => {
+    if (phase !== 'active' || isLiveBlocked) {
       return;
     }
-    if (!isReadyToValidate) {
-      setValidationMessage(t('ar.messages.tooFar'));
+    if (!isWithinRange || proximityCompletedRef.current) {
       return;
     }
-    if (combatEnabled && !hasLaunched) {
-      setShowCombat(true);
-      return;
-    }
-    completeStep(t('ar.messages.validatedChest'));
-  };
 
-  const pendingAnswerRef = useRef<string | undefined>(undefined);
+    proximityCompletedRef.current = true;
+    void completeStep(t('ar.messages.validatedChest'), unlockedAnswerRef.current);
+  }, [phase, isLiveBlocked, isWithinRange, t]);
 
   const handleBarcodeScanned = (result: BarcodeScanningResult) => {
-    if (hasLaunched || showCombat) {
+    if (phase !== 'qr_scanning' || isLiveBlocked) {
       return;
     }
-    if (isLiveBlocked) {
-      setValidationMessage(t('ar.messages.stepSuspended'));
+
+    const now = Date.now();
+    if (now - lastScanAtRef.current < 1200) {
       return;
     }
-    const expected = qrPayload ?? null;
-    const matches = expected ? result.data === expected : result.data.startsWith('lootopia:');
+    lastScanAtRef.current = now;
+
+    const expected = qrPayload?.trim() ?? '';
+    const scanned = result.data?.trim() ?? '';
+    const matches =
+      expected.length > 0
+        ? qrPayloadsMatch(scanned, expected)
+        : scanned.startsWith('lootopia:');
+
     if (matches) {
-      pendingAnswerRef.current = result.data;
-      if (combatEnabled) {
-        setValidationMessage(t('ar.messages.qrRecognizedGuardian'));
-        setShowCombat(true);
-      } else {
-        completeStep(t('ar.messages.qrValidated'), result.data);
-      }
-    } else {
-      setValidationMessage(t('ar.messages.qrUnknown'));
+      setScannedPayload(scanned);
+      setValidationMessage('');
+      setPhase('qr_revealed');
+      return;
     }
+    setValidationMessage(t('ar.messages.qrUnknown'));
   };
 
-  const handleCombatWon = () => {
-    setShowCombat(false);
-    completeStep(t('ar.messages.guardianDefeated'), pendingAnswerRef.current);
+  const handleUnlockCode = () => {
+    if (!requiredCode) {
+      setPhase('active');
+      return;
+    }
+    if (normalizeCode(codeInput) !== normalizeCode(requiredCode)) {
+      setCodeError(t('ar.accessCode.incorrect'));
+      return;
+    }
+    unlockedAnswerRef.current = requiredCode;
+    setCodeError('');
+    setValidationMessage(t('ar.accessCode.unlocked'));
+    setPhase('active');
+  };
+
+  const handleQrRevealContinue = () => {
+    void completeStep(t('ar.messages.qrValidated'), scannedPayload ?? qrPayload);
   };
 
   const playAudioHint = () => {
@@ -239,20 +335,103 @@ export function ARExperience({
     );
   }
 
+  if (phase === 'access_code') {
+    return (
+      <View style={[styles.wrapper, fullScreen && styles.wrapperFullScreen, styles.codeGate]}>
+        <View style={styles.codeGateCard}>
+          <Text style={styles.kicker}>{t('ar.accessCode.kicker')}</Text>
+          <Text style={styles.title}>{t('ar.accessCode.title')}</Text>
+          <Text style={styles.text}>{clue}</Text>
+          <TextInput
+            style={styles.codeInput}
+            placeholder={t('ar.accessCode.placeholder')}
+            placeholderTextColor={colors.textFaint}
+            value={codeInput}
+            onChangeText={(value) => {
+              setCodeInput(value);
+              setCodeError('');
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={handleUnlockCode}
+          />
+          {codeError ? <Text style={styles.codeError}>{codeError}</Text> : null}
+          <Pressable
+            style={[styles.button, !codeInput.trim() && styles.buttonDisabled]}
+            onPress={handleUnlockCode}
+            disabled={!codeInput.trim()}
+          >
+            <Text style={styles.buttonText}>{t('ar.accessCode.unlock')}</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  const helperText =
+    validationMessage ||
+    (phase === 'qr_display'
+      ? t('ar.helperTapScan')
+      : phase === 'qr_scanning'
+        ? t('ar.helperScanning')
+        : phase === 'active' && isWithinRange
+          ? t('ar.helperNear')
+          : showQrMode
+            ? t('ar.helperScanPhysicalQr')
+            : t('ar.helperDefault'));
+
+  const scanLineTranslate = scanLine.interpolate({ inputRange: [0, 1], outputRange: [-90, 90] });
+  const revealSecret = qrRevealContent?.trim() || scannedPayload || qrPayload?.trim() || '';
+
   return (
     <View style={[styles.wrapper, fullScreen && styles.wrapperFullScreen]}>
       <CameraView
         style={StyleSheet.absoluteFill}
         facing="back"
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        onBarcodeScanned={hasLaunched ? undefined : handleBarcodeScanned}
+        onBarcodeScanned={phase === 'qr_scanning' ? handleBarcodeScanned : undefined}
       />
 
-      <View pointerEvents="none" style={styles.chestAnchor}>
-        <GLView style={styles.chestCanvas} onContextCreate={onContextCreate} />
-      </View>
+      {showQrMode && phase === 'qr_display' ? (
+        <View pointerEvents="box-none" style={styles.qrAnchor}>
+          <Animated.View style={[styles.qrPanelWrap, { transform: [{ scale: qrPulse }] }]}>
+            <View style={styles.holoTag}>
+              <View style={styles.holoTagInner}>
+                <Ionicons name="qr-code" size={72} color={colors.gold} />
+                <Text style={styles.holoTagLabel}>{t('ar.qrOverlay.label')}</Text>
+              </View>
+              <View style={styles.qrLockVeil}>
+                <Ionicons name="lock-closed" size={28} color={colors.gold} />
+                <Text style={styles.qrLockText}>{t('ar.qrOverlay.locked')}</Text>
+                <Text style={styles.qrLockHint}>{t('ar.qrOverlay.physicalHint')}</Text>
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+      ) : null}
 
-      <View style={styles.overlay}>
+      {showQrMode && phase === 'qr_scanning' ? (
+        <View style={styles.scanFrame} pointerEvents="none">
+          <View style={[styles.scanCorner, styles.scanCornerTL]} />
+          <View style={[styles.scanCorner, styles.scanCornerTR]} />
+          <View style={[styles.scanCorner, styles.scanCornerBL]} />
+          <View style={[styles.scanCorner, styles.scanCornerBR]} />
+          <Animated.View style={[styles.scanLine, { transform: [{ translateY: scanLineTranslate }] }]} />
+        </View>
+      ) : null}
+
+      {!showQrMode && chestUnlocked ? (
+        <View pointerEvents="none" style={styles.chestAnchor}>
+          <GLView style={styles.chestCanvas} onContextCreate={onContextCreate} />
+        </View>
+      ) : null}
+
+      {phase === 'qr_revealed' && (
+        <ArSecretReveal secret={revealSecret} onContinue={handleQrRevealContinue} />
+      )}
+
+      <View style={styles.overlay} pointerEvents="box-none">
         {isLiveBlocked && (
           <View style={styles.liveBanner}>
             <Text style={styles.liveBannerText}>
@@ -271,48 +450,60 @@ export function ARExperience({
             </Text>
           </View>
         )}
-        <Text style={styles.kicker}>{t('ar.kicker')}</Text>
-        <Text style={styles.title}>{t('ar.title')}</Text>
-        <Text style={styles.text}>{clue}</Text>
 
-        {(photoClueUri || audioHintUri) && (
-          <View style={styles.cluesRow}>
-            {photoClueUri &&
-              (isPhotoClueUnlocked ? (
-                <StoredImage storedUrl={photoClueUri} style={styles.photoClue} />
-              ) : (
-                <View style={styles.photoClueLocked}>
-                  <Text style={styles.photoClueLockedIcon}>🔒</Text>
-                  <Text style={styles.photoClueLockedText}>
-                    {t('ar.clues.photoLocked', { meters: PHOTO_CLUE_RADIUS_METERS })}
-                  </Text>
-                </View>
-              ))}
-            {audioHintUri && (
-              <Pressable style={styles.audioButton} onPress={playAudioHint}>
-                <Text style={styles.audioButtonText}>{t('ar.clues.audioButton')}</Text>
+        {phase !== 'qr_revealed' && (
+          <>
+            <Text style={styles.kicker}>{showQrMode ? t('ar.qrOverlay.kicker') : t('ar.kicker')}</Text>
+            <Text style={styles.title}>{showQrMode ? t('ar.qrOverlay.title') : t('ar.title')}</Text>
+            {phase !== 'qr_scanning' && <Text style={styles.text}>{clue}</Text>}
+
+            {(photoClueUri || audioHintUri) && phase === 'active' && (
+              <View style={styles.cluesRow}>
+                {photoClueUri &&
+                  (isPhotoClueUnlocked ? (
+                    <StoredImage storedUrl={photoClueUri} style={styles.photoClue} />
+                  ) : (
+                    <View style={styles.photoClueLocked}>
+                      <Text style={styles.photoClueLockedIcon}>🔒</Text>
+                      <Text style={styles.photoClueLockedText}>
+                        {t('ar.clues.photoLocked', { meters: PHOTO_CLUE_RADIUS_METERS })}
+                      </Text>
+                    </View>
+                  ))}
+                {audioHintUri && (
+                  <Pressable style={styles.audioButton} onPress={playAudioHint}>
+                    <Text style={styles.audioButtonText}>{t('ar.clues.audioButton')}</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            <Text style={styles.statusText}>
+              {locationPermissionGranted
+                ? t('ar.status.distance', { distance: distanceMeters ?? '?' })
+                : t('ar.status.geoUnavailable')}
+            </Text>
+            <Text style={styles.helperText}>{helperText}</Text>
+
+            {showQrMode && phase === 'qr_display' && !isLiveBlocked && (
+              <Pressable style={styles.scanButton} onPress={() => setPhase('qr_scanning')}>
+                <Ionicons name="qr-code-outline" size={18} color={colors.background} />
+                <Text style={styles.scanButtonText}>{t('ar.qrScan.button')}</Text>
               </Pressable>
             )}
-          </View>
-        )}
-        <Text style={styles.statusText}>
-          {locationPermissionGranted
-            ? t('ar.status.distance', { distance: distanceMeters ?? '?' })
-            : t('ar.status.geoUnavailable')}
-        </Text>
-        <Text style={styles.helperText}>{validationMessage || t('ar.helperDefault')}</Text>
-        <Pressable style={[styles.button, !isReadyToValidate && !hasLaunched && styles.buttonDisabled]} onPress={handleValidate}>
-          <Text style={styles.buttonText}>
-            {hasLaunched
-              ? t('ar.validateButton.validated')
-              : isReadyToValidate
-                ? t('ar.validateButton.ready')
-                : t('ar.validateButton.blocked')}
-          </Text>
-        </Pressable>
-      </View>
 
-      <CombatModal visible={showCombat} onWin={handleCombatWon} onFlee={() => setShowCombat(false)} />
+            {showQrMode && phase === 'qr_scanning' && (
+              <Pressable style={styles.cancelScanButton} onPress={() => setPhase('qr_display')}>
+                <Text style={styles.cancelScanButtonText}>{t('ar.qrScan.cancel')}</Text>
+              </Pressable>
+            )}
+
+            {hasLaunched && (
+              <Text style={styles.validatedText}>{t('ar.validateButton.validated')}</Text>
+            )}
+          </>
+        )}
+      </View>
     </View>
   );
 }
@@ -320,17 +511,108 @@ export function ARExperience({
 const styles = StyleSheet.create({
   wrapper: { height: 460, borderRadius: radii.xl, overflow: 'hidden', backgroundColor: colors.background, borderColor: colors.glassBorder, borderWidth: 1 },
   wrapperFullScreen: { flex: 1, height: undefined, borderRadius: 0, borderWidth: 0 },
+  codeGate: { justifyContent: 'center', padding: 20, backgroundColor: colors.background },
+  codeGateCard: { ...glassCard, padding: 22 },
+  codeInput: {
+    marginTop: 16,
+    backgroundColor: colors.glassStrong,
+    borderColor: colors.glassBorderStrong,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    color: colors.foreground,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    letterSpacing: 2,
+    textAlign: 'center',
+  },
+  codeError: { color: colors.danger, marginTop: 10, fontWeight: '700', textAlign: 'center' },
   chestAnchor: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingBottom: 120 },
   chestCanvas: { width: 200, height: 200 },
+  qrAnchor: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingBottom: 120 },
+  qrPanelWrap: { alignItems: 'center' },
+  holoTag: {
+    width: 220,
+    height: 220,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(11,15,26,0.55)',
+    borderColor: colors.gold,
+    borderWidth: 2,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  holoTagInner: { alignItems: 'center', gap: 8 },
+  holoTagLabel: { color: colors.gold, fontWeight: '900', fontSize: 11, letterSpacing: 0.8 },
+  qrLockVeil: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11,15,26,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.lg,
+    paddingHorizontal: 16,
+  },
+  qrLockText: { color: colors.gold, fontWeight: '900', fontSize: 12, marginTop: 8, letterSpacing: 0.6 },
+  qrLockHint: { color: colors.textMuted, fontWeight: '700', fontSize: 10, marginTop: 6, textAlign: 'center', lineHeight: 14 },
+  scanFrame: {
+    position: 'absolute',
+    top: '28%',
+    alignSelf: 'center',
+    width: 240,
+    height: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanCorner: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderColor: colors.teal,
+  },
+  scanCornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
+  scanCornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
+  scanCornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
+  scanCornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
+  scanLine: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    height: 2,
+    backgroundColor: colors.teal,
+    shadowColor: colors.teal,
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+  },
   overlay: { flex: 1, justifyContent: 'flex-end', padding: 18, backgroundColor: 'rgba(11,15,26,0.35)' },
   kicker: { color: colors.gold, fontWeight: '900', fontSize: 12, letterSpacing: 1.2 },
   title: { color: colors.foreground, fontWeight: '900', fontSize: 24, marginTop: 6 },
   text: { color: colors.foreground, marginTop: 10, lineHeight: 21 },
   statusText: { color: colors.teal, marginTop: 8, fontWeight: '700' },
   helperText: { color: colors.textMuted, marginTop: 10, lineHeight: 20 },
-  button: { marginTop: 16, alignSelf: 'flex-start', backgroundColor: colors.gold, paddingHorizontal: 16, paddingVertical: 14, borderRadius: radii.md },
-  buttonDisabled: { opacity: 0.55 },
+  validatedText: { color: colors.teal, marginTop: 12, fontWeight: '900' },
+  button: { marginTop: 16, alignSelf: 'stretch', backgroundColor: colors.gold, paddingHorizontal: 16, paddingVertical: 14, borderRadius: radii.md, alignItems: 'center' },
+  buttonDisabled: { opacity: 0.5 },
   buttonText: { color: colors.background, fontWeight: '900' },
+  scanButton: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.gold,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: radii.pill,
+    alignSelf: 'center',
+  },
+  scanButtonText: { color: colors.background, fontWeight: '900', fontSize: 14 },
+  cancelScanButton: {
+    marginTop: 12,
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  cancelScanButtonText: { color: colors.foreground, fontWeight: '800', fontSize: 13 },
   liveBanner: { backgroundColor: 'rgba(248,113,113,0.16)', borderColor: colors.danger, borderWidth: 1, borderRadius: radii.md, padding: 10, marginBottom: 10 },
   liveBannerText: { color: colors.danger, fontWeight: '900', fontSize: 12 },
   redirectBanner: { backgroundColor: colors.tealSoft, borderColor: colors.teal },

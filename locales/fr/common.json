@@ -193,6 +193,7 @@
     "map": "Carte",
     "available": "Disponibles",
     "inProgress": "En cours",
+    "completed": "Terminées",
     "field": "Terrain",
     "profile": "Profil"
   },
@@ -295,7 +296,8 @@
       "rewardChip": "🏆 {points} pts",
       "distanceChip": "📍 {distance}",
       "acceptCta": "Accepter la chasse",
-      "acceptedCta": "En cours ✓ — voir le détail"
+      "acceptedCta": "En cours ✓ — voir le détail",
+      "stepsOnMap": "{count} étapes affichées sur la carte"
     },
     "chaseMap": {
       "markerTitle": "Zone de chasse",

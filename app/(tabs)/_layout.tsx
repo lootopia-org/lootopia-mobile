@@ -42,6 +42,10 @@ export default function TabsLayout() {
         options={{ title: t('tabs.inProgress'), tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" color={color} size={size} /> }}
       />
       <Tabs.Screen
+        name="completed"
+        options={{ title: t('tabs.completed'), tabBarIcon: ({ color, size }) => <Ionicons name="trophy-outline" color={color} size={size} /> }}
+      />
+      <Tabs.Screen
         name="field"
         options={{
           title: t('tabs.field'),

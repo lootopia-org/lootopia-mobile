@@ -10,6 +10,7 @@ type ApiHuntStep = {
   description?: string | null;
   type?: string | null;
   awnser?: string | null;
+  scanInAr?: boolean;
   latitude?: string | null;
   longitude?: string | null;
   points?: number | null;
@@ -59,6 +60,7 @@ export function fromApiStep(step: ApiHuntStep): ChaseStep {
     points: Math.round(step.points ?? DEFAULT_STEP_POINTS),
     location: lat !== null && lng !== null ? { latitude: lat, longitude: lng } : undefined,
     qrPayload: type === 'qr_code' ? answer : undefined,
+    scanInAr: step.scanInAr ?? false,
     photoClueUri: type === 'photo' ? answer : undefined,
     completed: false,
     radiusMeters: 30,
@@ -101,6 +103,7 @@ export function toApiStep(step: HuntStepForm, index: number) {
     longitude: step.longitude.trim(),
     points: Number(step.points),
     awnser: step.answer?.trim() || null,
+    scanInAr: step.type === 'qr_code' ? Boolean(step.scanInAr) : false,
   };
 }
 
@@ -142,6 +145,7 @@ export function chaseToHuntForm(chase: Chase): HuntForm {
             description: step.description,
             type: step.type ?? 'checkpoint',
             answer: step.answer,
+            scanInAr: step.scanInAr ?? false,
             latitude: step.location ? String(step.location.latitude) : '',
             longitude: step.location ? String(step.location.longitude) : '',
             points: step.points ?? DEFAULT_STEP_POINTS,

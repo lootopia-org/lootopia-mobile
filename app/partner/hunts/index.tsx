@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/src/state/AuthContext';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
+import { useCatalogHuntEvents } from '@/src/hooks/use-catalog-hunt-events';
 import { colors, glassCard, radii } from '@/src/theme';
 
 export default function PartnerHuntsScreen() {
@@ -41,6 +42,8 @@ export default function PartnerHuntsScreen() {
       load();
     }, [load])
   );
+
+  useCatalogHuntEvents(load);
 
   const allowed = user?.role === 'partner' || user?.role === 'admin';
 

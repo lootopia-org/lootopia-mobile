@@ -16,7 +16,7 @@ function stepPoints(step: ChaseStep): number {
 
 export function useFinishHuntStep() {
   const { token } = useAuth();
-  const { acceptedHunts, completeStep: completeStepLocally, refreshFromServer } = useHunts();
+  const { acceptedHunts, completeStep: completeStepLocally, markHuntCompleted, refreshFromServer } = useHunts();
   const { profile, refreshProfile } = usePlayerProfileContext();
 
   return useCallback(
@@ -47,10 +47,14 @@ export function useFinishHuntStep() {
         }
       }
 
+      if (huntCompleted) {
+        markHuntCompleted(chase.id);
+      }
+
       await refreshFromServer();
 
       return { pointsEarned, huntCompleted };
     },
-    [acceptedHunts, completeStepLocally, profile, refreshFromServer, refreshProfile, token]
+    [acceptedHunts, completeStepLocally, markHuntCompleted, profile, refreshFromServer, refreshProfile, token]
   );
 }

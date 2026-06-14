@@ -81,7 +81,7 @@ export default function InProgressScreen() {
               </View>
               <View style={styles.cardRow}>
                 <Text style={styles.cardMeta}>
-                  {t('hunts:shared.meta.stepProgress', { current: Math.min(completed + 1, total), total })}
+                  {t('hunts:shared.meta.progressCounter', { current: completed, total })}
                   {nextStep ? ` · ${nextStep.title}` : t('hunts:shared.status.completed')}
                 </Text>
                 <View style={styles.actionsRow}>

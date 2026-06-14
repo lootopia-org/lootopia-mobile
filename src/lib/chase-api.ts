@@ -44,6 +44,7 @@ export type ChaseStep = {
   radiusMeters?: number;
   arHint?: string;
   qrPayload?: string;
+  scanInAr?: boolean;
   photoClueUri?: string;
   audioHintUri?: string;
 };
@@ -185,9 +186,25 @@ export const chaseApi = {
     return normalizeChasesResponse(response);
   },
 
+  getCompletedHunts: async (): Promise<Chase[]> => {
+    const response = await apiRequest<unknown>('/hunt/completed');
+    return normalizeChasesResponse(response);
+  },
+
   getCompletedStepIds: async (huntId: string): Promise<string[]> => {
-    const response = await apiRequest<Array<{ id?: string }>>(`/hunt/step/completed/${huntId}`);
-    return response.map((step) => step.id).filter((id): id is string => Boolean(id));
+    const response = await apiRequest<unknown>(`/hunt/step/completed/${huntId}`);
+    if (!Array.isArray(response)) {
+      return [];
+    }
+    return response
+      .map((step) => {
+        if (!step || typeof step !== 'object') {
+          return undefined;
+        }
+        const id = (step as { id?: string }).id;
+        return typeof id === 'string' && id.length > 0 ? id : undefined;
+      })
+      .filter((id): id is string => Boolean(id));
   },
 
   getProgress: async (chaseId: string): Promise<UserProgress | null> =>
