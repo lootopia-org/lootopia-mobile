@@ -48,17 +48,20 @@
     "editLoadError": "Chasse introuvable",
     "accessDenied": "Accès réservé aux organisateurs",
     "title": "Mes chasses",
-    "stepsMeta": "{count} étapes · {status}"
+    "stepsMeta": "{count} étapes · {status}",
+    "detail": {
+      "edit": "Modifier la chasse",
+      "delete": "Supprimer la chasse"
+    }
   },
   "field": {
     "header": "Terrain",
     "segments": {
       "creation": "Création",
-      "liveops": "Live ops",
-      "heatmap": "Heatmap"
+      "liveops": "Live ops"
     },
     "creation": {
-      "myHunts": "Mes chasses",
+      "newHunt": "Nouvelle chasse",
       "newHuntHere": "Nouvelle chasse ici",
       "errors": {
         "locationDenied": "Permission localisation refusée.",

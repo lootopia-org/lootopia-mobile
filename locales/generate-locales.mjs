@@ -872,7 +872,7 @@ const en = {
         },
         qr: {
           alt: 'QR code to open mobile capture',
-          expoHint: 'Expo Go link (scan with your phone camera):',
+          expoHint: 'Scan with your phone camera:',
           signInHint: 'Sign in on mobile with the same partner account, then scan this QR or open:',
         },
         errors: {
@@ -883,9 +883,9 @@ const en = {
         captureRedirect: {
           invalidTitle: 'Invalid capture link',
           invalidMessage: 'Start a new capture from the hunt wizard on web.',
-          expoTitle: 'Open in Expo Go',
+          expoTitle: 'Open in Lootopia Mobile',
           expoMessage:
-            'Open Lootopia Mobile in Expo Go first (same tunnel), then tap the button below. Sign in with your partner account before taking the photo.',
+            'Open Lootopia Mobile first, then tap the button below. Sign in with your partner account before taking the photo.',
           openCapture: 'Open capture in Lootopia Mobile',
         },
       },

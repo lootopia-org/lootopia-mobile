@@ -3,11 +3,13 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/src/state/AuthContext';
+import { isPlayerUser } from '@/src/lib/player-access';
 import { colors } from '@/src/theme';
 
 export default function TabsLayout() {
   const { t } = useTranslation('common');
   const { user } = useAuth();
+  const isPlayer = isPlayerUser(user);
   const canAccessField = user?.role === 'partner' || user?.role === 'admin';
 
   return (
@@ -31,19 +33,35 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: t('tabs.map'), tabBarIcon: ({ color, size }) => <Ionicons name="navigate-outline" color={color} size={size} /> }}
+        options={{
+          title: t('tabs.map'),
+          href: isPlayer ? undefined : null,
+          tabBarIcon: ({ color, size }) => <Ionicons name="navigate-outline" color={color} size={size} />,
+        }}
       />
       <Tabs.Screen
         name="chases"
-        options={{ title: t('tabs.available'), tabBarIcon: ({ color, size }) => <Ionicons name="map-outline" color={color} size={size} /> }}
+        options={{
+          title: t('tabs.available'),
+          href: isPlayer ? undefined : null,
+          tabBarIcon: ({ color, size }) => <Ionicons name="map-outline" color={color} size={size} />,
+        }}
       />
       <Tabs.Screen
         name="in-progress"
-        options={{ title: t('tabs.inProgress'), tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" color={color} size={size} /> }}
+        options={{
+          title: t('tabs.inProgress'),
+          href: isPlayer ? undefined : null,
+          tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" color={color} size={size} />,
+        }}
       />
       <Tabs.Screen
         name="completed"
-        options={{ title: t('tabs.completed'), tabBarIcon: ({ color, size }) => <Ionicons name="trophy-outline" color={color} size={size} /> }}
+        options={{
+          title: t('tabs.completed'),
+          href: isPlayer ? undefined : null,
+          tabBarIcon: ({ color, size }) => <Ionicons name="trophy-outline" color={color} size={size} />,
+        }}
       />
       <Tabs.Screen
         name="field"
