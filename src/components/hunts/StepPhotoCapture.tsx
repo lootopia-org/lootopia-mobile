@@ -9,9 +9,14 @@ import {
   View,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useTranslation } from 'react-i18next';
 import { StoredImage } from '@/src/components/StoredImage';
 import { colors, glassCard, radii } from '@/src/theme';
+
+const MAX_WIDTH = 1280;
+const MAX_HEIGHT = 1280;
+const JPEG_QUALITY = 0.82;
 
 type Props = {
   description: string;
@@ -19,13 +24,43 @@ type Props = {
   onSubmit: (photoData: string) => Promise<void>;
 };
 
+async function compressCaptureForSubmit(uri: string): Promise<string> {
+  const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+    Image.getSize(uri, (width, height) => resolve({ width, height }), reject);
+  });
+
+  const scale = Math.min(1, MAX_WIDTH / dimensions.width, MAX_HEIGHT / dimensions.height);
+  const actions =
+    scale < 1
+      ? [
+          {
+            resize: {
+              width: Math.max(1, Math.round(dimensions.width * scale)),
+              height: Math.max(1, Math.round(dimensions.height * scale)),
+            },
+          },
+        ]
+      : [];
+
+  const result = await manipulateAsync(uri, actions, {
+    compress: JPEG_QUALITY,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
+
+  if (!result.base64) {
+    throw new Error('Failed to process image');
+  }
+
+  return result.base64;
+}
+
 export function StepPhotoCapture({ description, referencePhotoUrl, onSubmit }: Props) {
   const { t } = useTranslation(['hunts', 'common']);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -47,10 +82,9 @@ export function StepPhotoCapture({ description, referencePhotoUrl, onSubmit }: P
 
   const takePhoto = async () => {
     try {
-      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.85, base64: true });
+      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.85 });
       if (photo?.uri) {
         setPreviewUri(photo.uri);
-        setPhotoBase64(photo.base64 ?? null);
         setCameraOpen(false);
       }
     } catch {
@@ -60,16 +94,22 @@ export function StepPhotoCapture({ description, referencePhotoUrl, onSubmit }: P
   };
 
   const submit = async () => {
-    if (!photoBase64 || submitting || done) {
+    if (!previewUri || submitting || done) {
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      await onSubmit(`data:image/jpeg;base64,${photoBase64}`);
+      const photoBase64 = await compressCaptureForSubmit(previewUri);
+      await onSubmit(photoBase64);
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('hunts:stepPhoto.errors.notRecognized'));
+      const message = err instanceof Error ? err.message : t('hunts:stepPhoto.errors.notRecognized');
+      setError(
+        /photo does not match|not recognized|not the correct/i.test(message)
+          ? t('hunts:stepPhoto.errors.notRecognized')
+          : message
+      );
     } finally {
       setSubmitting(false);
     }

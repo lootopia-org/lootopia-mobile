@@ -1,6 +1,7 @@
 import { apiRequest } from '@/src/lib/api-client';
 import {
   fromApiHunt,
+  normalizeHuntDetailResponse,
   toCreateHuntPayload,
   toUpdateHuntPayload,
   toApiStep,
@@ -168,7 +169,7 @@ const normalizeChasesResponse = (response: unknown): Chase[] => {
 
   return list
     .filter((item): item is ApiHuntRaw => Boolean(item && typeof item === 'object' && 'id' in item))
-    .map(normalizeChase);
+    .map((item) => normalizeChase(normalizeHuntDetailResponse(item)));
 };
 
 const buildLocalProgress = (chase: Chase): UserProgress => ({
@@ -203,8 +204,8 @@ export const chaseApi = {
   },
 
   getChase: async (chaseId: string): Promise<Chase> => {
-    const chase = await apiRequest<ApiHuntRaw>(`/hunt/${chaseId}`);
-    return normalizeChase(chase);
+    const response = await apiRequest<unknown>(`/hunt/${chaseId}`);
+    return normalizeChase(normalizeHuntDetailResponse(response));
   },
 
   joinHunt: async (huntId: string): Promise<void> => {

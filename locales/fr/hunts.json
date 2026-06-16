@@ -391,7 +391,8 @@
       "audioButton": "🔊 Indice audio"
     },
     "status": {
-      "distance": "Position : {distance} m du point",
+      "distance": "Position : {distance} du point",
+      "acquiringGps": "Acquisition du signal GPS…",
       "geoUnavailable": "Géolocalisation indisponible"
     },
     "helperDefault": "Approche-toi du point — ou scanne le QR code de l’étape avec la caméra.",
@@ -399,6 +400,11 @@
     "helperScanDisplayedQr": "Scanne le QR code affiché à l’écran avec ta caméra pour valider.",
     "helperScanPhysicalQr": "Trouve le QR imprimé par l’organisateur et scanne-le pour révéler le secret.",
     "helperNear": "Tu es proche — validation de l’étape…",
+    "helperBuriedChest": "Quelque chose est enterré dans l’herbe devant toi — glisse vers le haut pour lancer la dynamite ! Atteins {{required}} impacts ({{bombs}} bombes restantes).",
+    "helperThrowDynamite": "Glisse rapidement vers le haut pour lancer la dynamite sur le monticule.",
+    "helperBombProgress": "Impact direct {{hits}}/{{required}} — continue !",
+    "helperChestRevealed": "Le coffre est découvert — récupère ton trésor !",
+    "helperGetCloserChest": "Approche-toi à moins de {radius} m pour repérer le trésor enterré.",
     "qrOverlay": {
       "kicker": "QR CODE",
       "title": "Scanne ce code",
@@ -442,7 +448,11 @@
       "huntCompleted": "Chasse terminée !",
       "mustBeNear": "Tu dois être à proximité du point (ou scanner son QR code) avant de valider.",
       "stepValidatedChest": "Étape validée — le coffre est à toi !",
-      "qrRecognizedValidated": "QR code reconnu — étape validée !"
+      "qrRecognizedValidated": "QR code reconnu — étape validée !",
+      "bombMiss": "Raté ! Lance plus fort ou plus doucement pour toucher le monticule.",
+      "bombHit": "Impact direct ! {{hits}}/{{required}} — le monticule se fissure…",
+      "bombHitFinal": "En plein dans le mille ! Le coffre se libère…",
+      "bombsExhausted": "Pas de chance cette fois — plus de dynamite !"
     },
     "answerInput": {
       "riddlePlaceholder": "Réponse",
@@ -507,11 +517,15 @@
     "retake": "Reprendre",
     "send": "Envoyer",
     "capture": "Capturer",
+    "loadingReference": "Chargement de la référence…",
     "validated": "Étape validée ✓",
     "errors": {
       "cameraDenied": "Permission caméra refusée.",
       "captureFailed": "Capture échouée",
-      "notRecognized": "Photo non reconnue"
+      "notRecognized": "Photo non reconnue",
+      "uploadFailed": "Échec de l’envoi. Réessaie.",
+      "serverUnavailable": "Le serveur est temporairement indisponible. Réessaie dans quelques minutes.",
+      "networkFailed": "Erreur réseau — vérifie ta connexion et réessaie."
     }
   },
   "capture": {

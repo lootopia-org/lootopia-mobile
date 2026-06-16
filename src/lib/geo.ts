@@ -2,6 +2,84 @@
 
 export type GeoPoint = { latitude: number; longitude: number };
 
+export function parseCoord(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  const text = String(value).trim().replace(',', '.');
+  if (!text) {
+    return null;
+  }
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** Parse latitude/longitude from API hunt or step payloads (flat or nested). */
+export function geoPointFromApiFields(
+  source: Record<string, unknown> | null | undefined
+): GeoPoint | undefined {
+  if (!source) {
+    return undefined;
+  }
+
+  const nested =
+    source.location && typeof source.location === 'object' && !Array.isArray(source.location)
+      ? (source.location as Record<string, unknown>)
+      : undefined;
+
+  let lat = parseCoord(source.latitude ?? source.lat ?? nested?.latitude ?? nested?.lat);
+  let lng = parseCoord(
+    source.longitude ?? source.lng ?? source.lon ?? nested?.longitude ?? nested?.lng ?? nested?.lon
+  );
+
+  if (lat === null || lng === null) {
+    return undefined;
+  }
+
+  if (Math.abs(lat) > 90 && Math.abs(lng) <= 90) {
+    [lat, lng] = [lng, lat];
+  }
+
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return undefined;
+  }
+  if (lat === 0 && lng === 0) {
+    return undefined;
+  }
+
+  return { latitude: lat, longitude: lng };
+}
+
+export function isValidGeoPoint(point: GeoPoint | null | undefined): point is GeoPoint {
+  if (!point) {
+    return false;
+  }
+  if (Math.abs(point.latitude) < 0.0001 && Math.abs(point.longitude) < 0.0001) {
+    return false;
+  }
+  if (point.latitude === 0 && point.longitude === 0) {
+    return false;
+  }
+  return Math.abs(point.latitude) <= 90 && Math.abs(point.longitude) <= 180;
+}
+
+export function isReliableDeviceLocation(point: {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+}): boolean {
+  if (!isValidGeoPoint(point)) {
+    return false;
+  }
+  if (point.accuracy != null && point.accuracy > 80_000) {
+    return false;
+  }
+  return true;
+}
+
 export const haversineDistanceMeters = (a: GeoPoint, b: GeoPoint) => {
   const toRad = (value: number) => (value * Math.PI) / 180;
   const earthRadius = 6371000;
