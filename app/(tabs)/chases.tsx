@@ -10,7 +10,7 @@ import { huntJoinErrorMessage } from '@/src/lib/hunt-join-errors';
 import { useCatalogHuntEvents } from '@/src/hooks/use-catalog-hunt-events';
 import { useHunts } from '@/src/state/HuntsContext';
 import { colors, glassCard, radii } from '@/src/theme';
-import { formatDistance, haversineDistanceMeters, type GeoPoint } from '@/src/lib/geo';
+import { formatDistance, haversineDistanceMeters, isValidGeoPoint, type GeoPoint } from '@/src/lib/geo';
 
 export default function ChasesScreen() {
   const router = useRouter();
@@ -50,16 +50,26 @@ export default function ChasesScreen() {
 
   useCatalogHuntEvents(loadChases);
 
-  useEffect(() => {
-    (async () => {
-      const permission = await Location.getForegroundPermissionsAsync();
-      if (!permission.granted) {
-        return;
-      }
-      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setPosition({ latitude: current.coords.latitude, longitude: current.coords.longitude });
-    })();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+
+      (async () => {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (cancelled || !permission.granted) {
+          return;
+        }
+        const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (!cancelled) {
+          setPosition({ latitude: current.coords.latitude, longitude: current.coords.longitude });
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   if (isLoading) {
     return (
@@ -69,13 +79,23 @@ export default function ChasesScreen() {
     );
   }
 
+  const available = chases.filter((chase) => !isCompleted(chase.id));
   const sorted = position
-    ? [...chases].sort(
-        (a, b) =>
-          haversineDistanceMeters(position, a.location) - haversineDistanceMeters(position, b.location)
-      )
-    : chases;
-  const available = sorted.filter((chase) => !isCompleted(chase.id));
+    ? [...available].sort((a, b) => {
+        const aLocated = isValidGeoPoint(a.location);
+        const bLocated = isValidGeoPoint(b.location);
+        if (aLocated && !bLocated) {
+          return -1;
+        }
+        if (!aLocated && bLocated) {
+          return 1;
+        }
+        if (!aLocated || !bLocated) {
+          return 0;
+        }
+        return haversineDistanceMeters(position, a.location) - haversineDistanceMeters(position, b.location);
+      })
+    : available;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
@@ -87,7 +107,10 @@ export default function ChasesScreen() {
         contentContainerStyle={{ paddingBottom: 24, gap: 14 }}
         renderItem={({ item }) => {
           const accepted = isAccepted(item.id);
-          const distance = position ? haversineDistanceMeters(position, item.location) : null;
+          const distance =
+            position && isValidGeoPoint(item.location)
+              ? haversineDistanceMeters(position, item.location)
+              : null;
           return (
             <Pressable onPress={() => router.push(`/chases/${item.id}`)} style={styles.cardWrap}>
               {item.image ? (

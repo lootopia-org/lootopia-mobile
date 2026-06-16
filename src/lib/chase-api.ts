@@ -1,4 +1,5 @@
 import { apiRequest } from '@/src/lib/api-client';
+import { isValidGeoPoint } from '@/src/lib/geo';
 import {
   fromApiHunt,
   normalizeHuntDetailResponse,
@@ -154,6 +155,38 @@ const localProgressStore = new Map<string, UserProgress>();
 
 const normalizeChase = (raw: ApiHuntRaw): Chase => fromApiHunt(raw);
 
+/** GET /hunt list payloads omit step coordinates — load detail for hunts missing a location. */
+const enrichChaseLocations = async (chases: Chase[]): Promise<Chase[]> => {
+  const stale = chases.filter((chase) => !isValidGeoPoint(chase.location));
+  if (stale.length === 0) {
+    return chases;
+  }
+
+  const details = await Promise.all(
+    stale.map(async (chase) => {
+      try {
+        const response = await apiRequest<unknown>(`/hunt/${chase.id}`);
+        return normalizeChase(normalizeHuntDetailResponse(response));
+      } catch {
+        return chase;
+      }
+    })
+  );
+
+  const byId = new Map(details.map((chase) => [chase.id, chase]));
+  return chases.map((chase) => {
+    const detailed = byId.get(chase.id);
+    if (!detailed || !isValidGeoPoint(detailed.location)) {
+      return chase;
+    }
+    return {
+      ...chase,
+      location: detailed.location,
+      steps: detailed.steps.length > 0 ? detailed.steps : chase.steps,
+    };
+  });
+};
+
 const normalizeChasesResponse = (response: unknown): Chase[] => {
   let list: unknown[] = [];
   if (Array.isArray(response)) {
@@ -185,12 +218,12 @@ const buildLocalProgress = (chase: Chase): UserProgress => ({
 export const chaseApi = {
   getChases: async (): Promise<Chase[]> => {
     const response = await apiRequest<unknown>('/hunt');
-    return normalizeChasesResponse(response);
+    return enrichChaseLocations(normalizeChasesResponse(response));
   },
 
   getManagedChases: async (partnerId?: string): Promise<Chase[]> => {
     const response = await apiRequest<unknown>('/hunt?all=true');
-    const hunts = normalizeChasesResponse(response);
+    const hunts = await enrichChaseLocations(normalizeChasesResponse(response));
     const owned = partnerId ? hunts.filter((chase) => chase.partnerId === partnerId) : hunts;
     return owned.filter((chase) => chase.status !== 'archived');
   },
@@ -245,12 +278,12 @@ export const chaseApi = {
 
   getJoinedHunts: async (): Promise<Chase[]> => {
     const response = await apiRequest<unknown>('/hunt/joined');
-    return normalizeChasesResponse(response);
+    return enrichChaseLocations(normalizeChasesResponse(response));
   },
 
   getCompletedHunts: async (): Promise<Chase[]> => {
     const response = await apiRequest<unknown>('/hunt/completed');
-    return normalizeChasesResponse(response);
+    return enrichChaseLocations(normalizeChasesResponse(response));
   },
 
   getCompletedStepIds: async (huntId: string): Promise<string[]> => {
