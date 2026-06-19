@@ -9,7 +9,9 @@ import { useFinishHuntStep } from '@/src/hooks/useFinishHuntStep';
 import { useHunts } from '@/src/state/HuntsContext';
 import { ChaseMap } from '@/src/components/ChaseMap';
 import { chaseApi, type Chase, type ChaseStep, type UserProgress } from '@/src/lib/chase-api';
-import { getStepPlayMode, shouldOpenArRoute } from '@/src/lib/step-navigation';
+import { formatDistance, isValidGeoPoint } from '@/src/lib/geo';
+import { checkDistanceToStep } from '@/src/lib/step-distance';
+import { getStepPlayMode, shouldOpenArRoute, stepRequiresProximity } from '@/src/lib/step-navigation';
 import { stepActionLabel, stepTypeLabel, type HuntStepType } from '@/src/lib/hunt-types';
 import { colors, glassCard, radii } from '@/src/theme';
 
@@ -26,6 +28,7 @@ export default function ChaseDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [qrScanStep, setQrScanStep] = useState<ChaseStep | null>(null);
   const [isSubmittingQr, setIsSubmittingQr] = useState(false);
+  const [openingStepId, setOpeningStepId] = useState<string | null>(null);
   const finishHuntStep = useFinishHuntStep();
 
   useEffect(() => {
@@ -65,12 +68,55 @@ export default function ChaseDetailScreen() {
     }, [canPlayHunts, refreshFromServer])
   );
 
-  const openStep = (step: ChaseStep) => {
+  const showTooFarAlert = (distanceMeters: number | undefined, radiusMeters: number) => {
+    Alert.alert(
+      t('hunts:ar.tooFarAlert.title'),
+      distanceMeters != null
+        ? t('hunts:ar.tooFarAlert.messageDistance', {
+            distance: formatDistance(distanceMeters),
+            radius: radiusMeters,
+          })
+        : t('hunts:ar.tooFarAlert.message')
+    );
+  };
+
+  const openStep = async (step: ChaseStep) => {
+    if (openingStepId) {
+      return;
+    }
+
     if (getStepPlayMode(step) === 'qr_scan') {
+      if (step.location && isValidGeoPoint(step.location) && stepRequiresProximity(step)) {
+        setOpeningStepId(step.id);
+        try {
+          const radiusMeters = step.radiusMeters ?? 30;
+          const check = await checkDistanceToStep(step.location, radiusMeters);
+          if (!check.ok && check.reason === 'too_far') {
+            showTooFarAlert(check.distanceMeters, radiusMeters);
+            return;
+          }
+        } finally {
+          setOpeningStepId(null);
+        }
+      }
       setQrScanStep(step);
       return;
     }
+
     if (shouldOpenArRoute(step)) {
+      if (step.location && isValidGeoPoint(step.location) && stepRequiresProximity(step)) {
+        setOpeningStepId(step.id);
+        try {
+          const radiusMeters = step.radiusMeters ?? 30;
+          const check = await checkDistanceToStep(step.location, radiusMeters);
+          if (!check.ok && check.reason === 'too_far') {
+            showTooFarAlert(check.distanceMeters, radiusMeters);
+            return;
+          }
+        } finally {
+          setOpeningStepId(null);
+        }
+      }
       router.push(`/ar/${chase!.id}?stepId=${step.id}`);
     }
   };
@@ -264,7 +310,8 @@ export default function ChaseDetailScreen() {
               {accepted && !completed && !stepCompleted && (
                 <Pressable
                   style={styles.secondaryButton}
-                  onPress={() => openStep(step)}
+                  disabled={openingStepId === step.id}
+                  onPress={() => void openStep(step)}
                 >
                   <Text style={styles.secondaryButtonText}>{stepActionLabel(type)}</Text>
                 </Pressable>

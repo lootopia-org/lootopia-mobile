@@ -8,6 +8,7 @@ import { ARExperience } from '@/src/components/ARExperience';
 import { StepAnswerInput } from '@/src/components/hunts/StepAnswerInput';
 import { StepPhotoCapture } from '@/src/components/hunts/StepPhotoCapture';
 import { useFinishHuntStep } from '@/src/hooks/useFinishHuntStep';
+import { isValidGeoPoint } from '@/src/lib/geo';
 import { chaseApi, type Chase } from '@/src/lib/chase-api';
 import type { HuntStepType } from '@/src/lib/hunt-types';
 import { useHunts } from '@/src/state/HuntsContext';
@@ -128,7 +129,7 @@ export default function ARScreen() {
     );
   }
 
-  if (!step.location) {
+  if (!step.location || !isValidGeoPoint(step.location)) {
     return (
       <View style={styles.center}>
         <Text style={styles.notFoundText}>{t('hunts:shared.errors.missingCoordinates')}</Text>
@@ -170,20 +171,23 @@ export default function ARScreen() {
         <StepPhotoCapture
           description={step.description}
           referencePhotoUrl={step.photoClueUri ?? step.answer}
+          stepLocation={stepLocation}
+          radiusMeters={step.radiusMeters ?? 30}
           onSubmit={(url) => finishStep(url)}
         />
       );
     }
 
     const isQrStep = stepType === 'qr_code';
-    const isChestStep = stepType === 'ar' || stepType === 'checkpoint';
+    const isArTreasureStep = stepType === 'ar';
 
     return (
       <ARExperience
         clue={step.description}
         targetLocation={stepLocation}
         radiusMeters={step.radiusMeters ?? 30}
-        accessCode={isChestStep ? step.answer : undefined}
+        accessCode={isArTreasureStep ? step.answer : undefined}
+        enableArChest={isArTreasureStep}
         qrPayload={isQrStep ? step.answer : step.qrPayload}
         qrRevealContent={isQrStep ? step.answer : undefined}
         requireQrScan={isQrStep}
@@ -192,6 +196,7 @@ export default function ARScreen() {
         liveOverride={liveOverride}
         fullScreen
         onComplete={(answer) => finishStep(answer)}
+        onBombsExhausted={() => router.back()}
       />
     );
   };
