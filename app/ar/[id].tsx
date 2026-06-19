@@ -171,6 +171,8 @@ export default function ARScreen() {
         <StepPhotoCapture
           description={step.description}
           referencePhotoUrl={step.photoClueUri ?? step.answer}
+          stepLocation={stepLocation}
+          radiusMeters={step.radiusMeters ?? 30}
           onSubmit={(url) => finishStep(url)}
         />
       );

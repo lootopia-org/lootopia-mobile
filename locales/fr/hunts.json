@@ -429,6 +429,11 @@
       "incorrect": "Code incorrect — réessaie.",
       "unlocked": "Code accepté — le coffre t’attend !"
     },
+    "tooFarAlert": {
+      "title": "Trop loin",
+      "message": "Tu es trop loin de ce point de chasse. Approche-toi pour continuer.",
+      "messageDistance": "Tu es à {distance}. Approche-toi à moins de {radius} m du point pour continuer."
+    },
     "helperTapScan": "Appuie sur Scanner pour lire le QR et révéler le secret.",
     "helperScanning": "Vise le QR code…",
     "validateButton": {
@@ -521,6 +526,9 @@
     "validated": "Étape validée ✓",
     "errors": {
       "cameraDenied": "Permission caméra refusée.",
+      "tooFar": "Tu es trop loin de ce point de chasse. Approche-toi pour prendre une photo.",
+      "locationDenied": "La géolocalisation est requise pour vérifier que tu es sur le point.",
+      "gpsUnavailable": "Impossible d’obtenir ta position. Réessaie dehors avec le GPS activé.",
       "captureFailed": "Capture échouée",
       "notRecognized": "Photo non reconnue",
       "uploadFailed": "Échec de l’envoi. Réessaie.",

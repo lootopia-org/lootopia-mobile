@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   PanResponder,
   Pressable,
@@ -179,6 +180,7 @@ export function ARExperience({
   const frameRef = useRef<number | null>(null);
   const appActiveRef = useAppActiveRef();
   const proximityCompletedRef = useRef(false);
+  const tooFarAlertShownRef = useRef(false);
   const lastScanAtRef = useRef(0);
   const unlockedAnswerRef = useRef<string | undefined>(undefined);
   const onChestUnburiedRef = useRef<() => void>(() => {});
@@ -308,10 +310,46 @@ export function ARExperience({
 
   const isWithinRange = distanceMeters !== null && distanceMeters <= radiusMeters;
   const isPhotoClueUnlocked = distanceMeters !== null && distanceMeters <= PHOTO_CLUE_RADIUS_METERS;
+  const isTooFar = hasReliableLocation && !isWithinRange;
+  const showCamera = !isTooFar;
   const showArScene = enableArChest && chestUnlocked && isWithinRange;
   const audioPlayer = useAudioPlayer(audioHintUri ?? null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const showTooFarAlert = useCallback(() => {
+    Alert.alert(
+      t('ar.tooFarAlert.title'),
+      distanceMeters !== null
+        ? t('ar.tooFarAlert.messageDistance', {
+            distance: formatDistance(distanceMeters),
+            radius: radiusMeters,
+          })
+        : t('ar.tooFarAlert.message')
+    );
+  }, [distanceMeters, radiusMeters, t]);
+
+  useEffect(() => {
+    if (!isTooFar || tooFarAlertShownRef.current || phase === 'access_code' || phase === 'completed') {
+      return;
+    }
+    tooFarAlertShownRef.current = true;
+    showTooFarAlert();
+  }, [isTooFar, phase, showTooFarAlert]);
+
+  useEffect(() => {
+    if (!isTooFar) {
+      tooFarAlertShownRef.current = false;
+    }
+  }, [isTooFar]);
+
+  const beginQrScan = () => {
+    if (isTooFar) {
+      showTooFarAlert();
+      return;
+    }
+    setPhase('qr_scanning');
+  };
 
   const completeStep = async (message: string, answer?: string) => {
     if (phase === 'completed' || isSubmitting) {
@@ -887,12 +925,16 @@ export function ARExperience({
 
   return (
     <View style={[styles.wrapper, fullScreen && styles.wrapperFullScreen]}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        onBarcodeScanned={phase === 'qr_scanning' ? handleBarcodeScanned : undefined}
-      />
+      {showCamera ? (
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onBarcodeScanned={phase === 'qr_scanning' ? handleBarcodeScanned : undefined}
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, styles.cameraPlaceholder]} />
+      )}
 
       {showQrMode && phase === 'qr_display' ? (
         <View pointerEvents="box-none" style={styles.qrAnchor}>
@@ -998,7 +1040,7 @@ export function ARExperience({
             <Text style={styles.helperText}>{helperText}</Text>
 
             {showQrMode && phase === 'qr_display' && !isLiveBlocked && (
-              <Pressable style={styles.scanButton} onPress={() => setPhase('qr_scanning')}>
+              <Pressable style={styles.scanButton} onPress={beginQrScan}>
                 <Ionicons name="qr-code-outline" size={18} color={colors.background} />
                 <Text style={styles.scanButtonText}>{t('ar.qrScan.button')}</Text>
               </Pressable>
@@ -1023,6 +1065,7 @@ export function ARExperience({
 const styles = StyleSheet.create({
   wrapper: { height: 460, borderRadius: radii.xl, overflow: 'hidden', backgroundColor: colors.background, borderColor: colors.glassBorder, borderWidth: 1 },
   wrapperFullScreen: { flex: 1, height: undefined, borderRadius: 0, borderWidth: 0 },
+  cameraPlaceholder: { backgroundColor: colors.background },
   codeGate: { justifyContent: 'center', padding: 20, backgroundColor: colors.background },
   codeGateCard: { ...glassCard, padding: 22 },
   codeInput: {

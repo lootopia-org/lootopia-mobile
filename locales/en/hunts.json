@@ -429,6 +429,11 @@
       "incorrect": "Incorrect code — try again.",
       "unlocked": "Code accepted — the chest awaits!"
     },
+    "tooFarAlert": {
+      "title": "Too far away",
+      "message": "You're too far from this hunt point. Please get closer to continue.",
+      "messageDistance": "You are {distance} away. Get within {radius} m of the point to continue."
+    },
     "helperTapScan": "Tap Scan to read the QR code and reveal the secret.",
     "helperScanning": "Aim at the QR code…",
     "validateButton": {
@@ -521,6 +526,9 @@
     "validated": "Step validated ✓",
     "errors": {
       "cameraDenied": "Camera permission denied.",
+      "tooFar": "You're too far from this hunt point. Please get closer to take a photo.",
+      "locationDenied": "Location permission is required to verify you're at the hunt point.",
+      "gpsUnavailable": "Could not get your position. Try again outdoors with GPS enabled.",
       "captureFailed": "Capture failed",
       "notRecognized": "Photo not recognized",
       "uploadFailed": "Upload failed. Please try again.",

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -13,6 +14,8 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useTranslation } from 'react-i18next';
 import { StoredImage } from '@/src/components/StoredImage';
 import { colors, glassCard, radii } from '@/src/theme';
+import { checkDistanceToStep } from '@/src/lib/step-distance';
+import { formatDistance, type GeoPoint } from '@/src/lib/geo';
 
 const MAX_WIDTH = 1280;
 const MAX_HEIGHT = 1280;
@@ -21,6 +24,8 @@ const JPEG_QUALITY = 0.82;
 type Props = {
   description: string;
   referencePhotoUrl?: string;
+  stepLocation: GeoPoint;
+  radiusMeters?: number;
   onSubmit: (photoData: string) => Promise<void>;
 };
 
@@ -55,29 +60,61 @@ async function compressCaptureForSubmit(uri: string): Promise<string> {
   return result.base64;
 }
 
-export function StepPhotoCapture({ description, referencePhotoUrl, onSubmit }: Props) {
+export function StepPhotoCapture({
+  description,
+  referencePhotoUrl,
+  stepLocation,
+  radiusMeters = 30,
+  onSubmit,
+}: Props) {
   const { t } = useTranslation(['hunts', 'common']);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   const openCamera = async () => {
-    if (done) {
+    if (done || checking) {
       return;
     }
     setError(null);
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        setError(t('hunts:stepPhoto.errors.cameraDenied'));
+    setChecking(true);
+    try {
+      const check = await checkDistanceToStep(stepLocation, radiusMeters);
+      if (!check.ok) {
+        if (check.reason === 'too_far') {
+          Alert.alert(
+            t('hunts:ar.tooFarAlert.title'),
+            check.distanceMeters != null
+              ? t('hunts:ar.tooFarAlert.messageDistance', {
+                  distance: formatDistance(check.distanceMeters),
+                  radius: radiusMeters,
+                })
+              : t('hunts:ar.tooFarAlert.message')
+          );
+        } else if (check.reason === 'location_denied') {
+          setError(t('hunts:stepPhoto.errors.locationDenied'));
+        } else if (check.reason === 'location_unavailable') {
+          setError(t('hunts:stepPhoto.errors.gpsUnavailable'));
+        }
         return;
       }
+
+      if (!permission?.granted) {
+        const result = await requestPermission();
+        if (!result.granted) {
+          setError(t('hunts:stepPhoto.errors.cameraDenied'));
+          return;
+        }
+      }
+      setCameraOpen(true);
+    } finally {
+      setChecking(false);
     }
-    setCameraOpen(true);
   };
 
   const takePhoto = async () => {
@@ -127,8 +164,12 @@ export function StepPhotoCapture({ description, referencePhotoUrl, onSubmit }: P
       ) : null}
       {previewUri ? <Image source={{ uri: previewUri }} style={styles.preview} /> : null}
       {!done && (
-        <Pressable style={styles.button} onPress={() => void openCamera()} disabled={submitting}>
-          <Text style={styles.buttonText}>{previewUri ? t('hunts:stepPhoto.retake') : t('hunts:stepPhoto.takePhoto')}</Text>
+        <Pressable style={styles.button} onPress={() => void openCamera()} disabled={submitting || checking}>
+          {checking ? (
+            <ActivityIndicator color={colors.background} size="small" />
+          ) : (
+            <Text style={styles.buttonText}>{previewUri ? t('hunts:stepPhoto.retake') : t('hunts:stepPhoto.takePhoto')}</Text>
+          )}
         </Pressable>
       )}
       {previewUri && !done ? (

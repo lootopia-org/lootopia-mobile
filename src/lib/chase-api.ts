@@ -155,9 +155,12 @@ const localProgressStore = new Map<string, UserProgress>();
 
 const normalizeChase = (raw: ApiHuntRaw): Chase => fromApiHunt(raw);
 
-/** GET /hunt list payloads omit step coordinates — load detail for hunts missing a location. */
-const enrichChaseLocations = async (chases: Chase[]): Promise<Chase[]> => {
-  const stale = chases.filter((chase) => !isValidGeoPoint(chase.location));
+/** Hunt search payloads omit steps and coordinates — load detail when needed. */
+const needsChaseDetail = (chase: Chase) =>
+  !isValidGeoPoint(chase.location) || chase.steps.length === 0;
+
+const enrichChaseSummaries = async (chases: Chase[]): Promise<Chase[]> => {
+  const stale = chases.filter(needsChaseDetail);
   if (stale.length === 0) {
     return chases;
   }
@@ -176,16 +179,39 @@ const enrichChaseLocations = async (chases: Chase[]): Promise<Chase[]> => {
   const byId = new Map(details.map((chase) => [chase.id, chase]));
   return chases.map((chase) => {
     const detailed = byId.get(chase.id);
-    if (!detailed || !isValidGeoPoint(detailed.location)) {
+    if (!detailed) {
       return chase;
     }
     return {
       ...chase,
-      location: detailed.location,
+      location: isValidGeoPoint(detailed.location) ? detailed.location : chase.location,
       steps: detailed.steps.length > 0 ? detailed.steps : chase.steps,
     };
   });
 };
+
+export type HuntSearchParams = {
+  q?: string;
+  status?: Chase['status'];
+  difficulty?: Chase['difficulty'];
+  partnerId?: string;
+  limit?: number;
+  offset?: number;
+};
+
+const HUNT_SEARCH_LIMIT = 100;
+
+function buildHuntSearchPath(params: HuntSearchParams = {}): string {
+  const search = new URLSearchParams();
+  if (params.q) search.set('q', params.q);
+  if (params.status) search.set('status', params.status);
+  if (params.difficulty) search.set('difficulty', params.difficulty);
+  if (params.partnerId) search.set('partnerId', params.partnerId);
+  if (params.limit != null) search.set('limit', String(params.limit));
+  if (params.offset != null) search.set('offset', String(params.offset));
+  const qs = search.toString();
+  return qs ? `/hunt/search?${qs}` : '/hunt/search';
+}
 
 const normalizeChasesResponse = (response: unknown): Chase[] => {
   let list: unknown[] = [];
@@ -216,14 +242,29 @@ const buildLocalProgress = (chase: Chase): UserProgress => ({
 });
 
 export const chaseApi = {
+  searchChases: async (params: HuntSearchParams = {}): Promise<Chase[]> => {
+    const response = await apiRequest<unknown>(buildHuntSearchPath(params));
+    return enrichChaseSummaries(normalizeChasesResponse(response));
+  },
+
   getChases: async (): Promise<Chase[]> => {
-    const response = await apiRequest<unknown>('/hunt');
-    return enrichChaseLocations(normalizeChasesResponse(response));
+    const response = await apiRequest<unknown>(
+      buildHuntSearchPath({ limit: HUNT_SEARCH_LIMIT })
+    );
+    const hunts = normalizeChasesResponse(response).filter(
+      (chase) => chase.status !== 'paused'
+    );
+    return enrichChaseSummaries(hunts);
   },
 
   getManagedChases: async (partnerId?: string): Promise<Chase[]> => {
-    const response = await apiRequest<unknown>('/hunt?all=true');
-    const hunts = await enrichChaseLocations(normalizeChasesResponse(response));
+    const response = await apiRequest<unknown>(
+      buildHuntSearchPath({
+        partnerId,
+        limit: HUNT_SEARCH_LIMIT,
+      })
+    );
+    const hunts = await enrichChaseSummaries(normalizeChasesResponse(response));
     const owned = partnerId ? hunts.filter((chase) => chase.partnerId === partnerId) : hunts;
     return owned.filter((chase) => chase.status !== 'archived');
   },
@@ -278,12 +319,12 @@ export const chaseApi = {
 
   getJoinedHunts: async (): Promise<Chase[]> => {
     const response = await apiRequest<unknown>('/hunt/joined');
-    return enrichChaseLocations(normalizeChasesResponse(response));
+    return enrichChaseSummaries(normalizeChasesResponse(response));
   },
 
   getCompletedHunts: async (): Promise<Chase[]> => {
     const response = await apiRequest<unknown>('/hunt/completed');
-    return enrichChaseLocations(normalizeChasesResponse(response));
+    return enrichChaseSummaries(normalizeChasesResponse(response));
   },
 
   getCompletedStepIds: async (huntId: string): Promise<string[]> => {
