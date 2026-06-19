@@ -1,4 +1,5 @@
 import type { Chase, ChaseStep } from '@/src/lib/chase-api';
+import { geoPointFromApiFields, isValidGeoPoint } from '@/src/lib/geo';
 import type { HuntForm, HuntStepForm, HuntStepType } from '@/src/lib/hunt-types';
 import { DEFAULT_STEP_POINTS } from '@/src/lib/hunt-types';
 
@@ -11,8 +12,13 @@ type ApiHuntStep = {
   type?: string | null;
   awnser?: string | null;
   scanInAr?: boolean;
-  latitude?: string | null;
-  longitude?: string | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
+  lat?: string | number | null;
+  lng?: string | number | null;
+  location?: { latitude?: unknown; longitude?: unknown; lat?: unknown; lng?: unknown } | null;
+  radiusMeters?: number | null;
+  radius?: number | null;
   points?: number | null;
 };
 
@@ -34,36 +40,52 @@ export type ApiHuntRaw = {
   steps?: ApiHuntStep[];
 };
 
-function parseCoord(value: string | null | undefined): number | null {
-  if (value === null || value === undefined || value === '') {
-    return null;
+/** Unwrap hunt detail payloads from GET /hunt/{id} (flat or nested). */
+export function normalizeHuntDetailResponse(response: unknown): ApiHuntRaw {
+  if (!response || typeof response !== 'object') {
+    throw new Error('Invalid hunt response');
   }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+
+  const raw = response as Record<string, unknown>;
+  if (raw.data && typeof raw.data === 'object') {
+    return normalizeHuntDetailResponse(raw.data);
+  }
+
+  const nestedHunt = raw.hunt;
+  if (nestedHunt && typeof nestedHunt === 'object') {
+    const hunt = nestedHunt as ApiHuntRaw;
+    return {
+      ...hunt,
+      id: hunt.id ?? String((nestedHunt as { id?: string }).id ?? raw.id ?? ''),
+      steps: (raw.steps ?? hunt.steps) as ApiHuntStep[] | undefined,
+    };
+  }
+
+  return raw as ApiHuntRaw;
 }
 
 export function fromApiStep(step: ApiHuntStep): ChaseStep {
-  const lat = parseCoord(step.latitude);
-  const lng = parseCoord(step.longitude);
   const type = (step.type ?? 'checkpoint') as HuntStepType;
   const answer = step.awnser ?? undefined;
   const description = step.description ?? '';
+  const rawStep = step as ApiHuntStep & { step_order?: number };
+  const location = geoPointFromApiFields(rawStep as Record<string, unknown>);
 
   return {
     id: step.id ?? '',
-    order: step.stepOrder ?? step.order ?? 0,
+    order: step.stepOrder ?? rawStep.step_order ?? step.order ?? 0,
     title: step.title,
     description,
     clue: description,
     type,
     answer,
     points: Math.round(step.points ?? DEFAULT_STEP_POINTS),
-    location: lat !== null && lng !== null ? { latitude: lat, longitude: lng } : undefined,
+    location,
     qrPayload: type === 'qr_code' ? answer : undefined,
     scanInAr: step.scanInAr ?? false,
     photoClueUri: type === 'photo' ? answer : undefined,
     completed: false,
-    radiusMeters: 30,
+    radiusMeters: step.radiusMeters ?? step.radius ?? 30,
     reward: Math.round(step.points ?? DEFAULT_STEP_POINTS),
   };
 }
@@ -71,7 +93,9 @@ export function fromApiStep(step: ApiHuntStep): ChaseStep {
 export function fromApiHunt(raw: ApiHuntRaw): Chase {
   const partnerId = raw.partnerId ?? raw.partner?.id ?? 'unknown';
   const steps = (raw.steps ?? []).map(fromApiStep).sort((a, b) => a.order - b.order);
-  const firstLocated = steps.find((step) => step.location);
+  const firstLocated = steps.find((step) => isValidGeoPoint(step.location));
+  const huntLocation =
+    geoPointFromApiFields(raw as Record<string, unknown>) ?? firstLocated?.location;
 
   return {
     id: raw.id,
@@ -87,7 +111,7 @@ export function fromApiHunt(raw: ApiHuntRaw): Chase {
     status: raw.status ?? 'active',
     participants: raw.participants ?? 0,
     rating: typeof raw.rating === 'string' ? Number(raw.rating) || 0 : (raw.rating ?? 0),
-    location: raw.location ?? firstLocated?.location ?? { latitude: 0, longitude: 0 },
+    location: huntLocation ?? { latitude: 0, longitude: 0 },
     steps,
   };
 }

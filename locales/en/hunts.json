@@ -391,7 +391,8 @@
       "audioButton": "🔊 Audio clue"
     },
     "status": {
-      "distance": "Position: {distance} m from point",
+      "distance": "Position: {distance} from point",
+      "acquiringGps": "Acquiring GPS signal…",
       "geoUnavailable": "Geolocation unavailable"
     },
     "helperDefault": "Get closer to the point — or scan the step QR code with the camera.",
@@ -399,6 +400,11 @@
     "helperScanDisplayedQr": "Scan the QR code shown on screen with your camera to validate.",
     "helperScanPhysicalQr": "Find the partner's printed QR mark and scan it to unlock the secret.",
     "helperNear": "You're close — validating the step…",
+    "helperBuriedChest": "Something is buried in the grass ahead — swipe up to throw dynamite! Land {{required}} hits ({{bombs}} bombs left).",
+    "helperThrowDynamite": "Swipe up quickly to throw dynamite at the mound.",
+    "helperBombProgress": "Direct hit {{hits}}/{{required}} — keep throwing!",
+    "helperChestRevealed": "The chest is uncovered — claim your treasure!",
+    "helperGetCloserChest": "Get within {radius} m to spot the buried treasure.",
     "qrOverlay": {
       "kicker": "QR CODE",
       "title": "Scan this code",
@@ -423,6 +429,11 @@
       "incorrect": "Incorrect code — try again.",
       "unlocked": "Code accepted — the chest awaits!"
     },
+    "tooFarAlert": {
+      "title": "Too far away",
+      "message": "You're too far from this hunt point. Please get closer to continue.",
+      "messageDistance": "You are {distance} away. Get within {radius} m of the point to continue."
+    },
     "helperTapScan": "Tap Scan to read the QR code and reveal the secret.",
     "helperScanning": "Aim at the QR code…",
     "validateButton": {
@@ -442,7 +453,11 @@
       "huntCompleted": "Hunt complete!",
       "mustBeNear": "You must be near the point (or scan its QR code) before validating.",
       "stepValidatedChest": "Step validated — the chest is yours!",
-      "qrRecognizedValidated": "QR code recognized — step validated!"
+      "qrRecognizedValidated": "QR code recognized — step validated!",
+      "bombMiss": "Miss! Throw harder or softer to land on the mound.",
+      "bombHit": "Direct hit! {{hits}}/{{required}} — the mound is cracking…",
+      "bombHitFinal": "Bullseye! The chest is breaking free…",
+      "bombsExhausted": "Better luck next time — you're out of dynamite!"
     },
     "answerInput": {
       "riddlePlaceholder": "Answer",
@@ -507,11 +522,18 @@
     "retake": "Retake",
     "send": "Send",
     "capture": "Capture",
+    "loadingReference": "Loading reference…",
     "validated": "Step validated ✓",
     "errors": {
       "cameraDenied": "Camera permission denied.",
+      "tooFar": "You're too far from this hunt point. Please get closer to take a photo.",
+      "locationDenied": "Location permission is required to verify you're at the hunt point.",
+      "gpsUnavailable": "Could not get your position. Try again outdoors with GPS enabled.",
       "captureFailed": "Capture failed",
-      "notRecognized": "Photo not recognized"
+      "notRecognized": "Photo not recognized",
+      "uploadFailed": "Upload failed. Please try again.",
+      "serverUnavailable": "The server is temporarily unavailable. Please try again in a few minutes.",
+      "networkFailed": "Network error — check your connection and try again."
     }
   },
   "capture": {

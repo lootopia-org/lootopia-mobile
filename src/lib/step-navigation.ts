@@ -20,3 +20,8 @@ export function getStepPlayMode(step: Pick<ChaseStep, 'type' | 'scanInAr'>): Ste
 export function shouldOpenArRoute(step: Pick<ChaseStep, 'type' | 'scanInAr'>): boolean {
   return getStepPlayMode(step) === 'ar' || getStepPlayMode(step) === 'answer' || getStepPlayMode(step) === 'photo';
 }
+
+export function stepRequiresProximity(step: Pick<ChaseStep, 'type' | 'scanInAr'>): boolean {
+  const mode = getStepPlayMode(step);
+  return mode === 'ar' || mode === 'photo' || mode === 'qr_scan';
+}

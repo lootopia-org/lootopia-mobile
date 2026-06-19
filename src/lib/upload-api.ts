@@ -10,7 +10,7 @@ export async function uploadStepImage(localUri: string): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/upload/image?kind=step`, {
     method: 'POST',
     headers,
-    credentials: token ? 'omit' : 'include',
+    credentials: 'omit',
     body: (() => {
       const formData = new FormData();
       formData.append('file', {

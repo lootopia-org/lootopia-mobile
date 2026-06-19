@@ -24,7 +24,16 @@
         {
           "locationWhenInUsePermission": "Lootopia uses your location to track hunt progress and validate checkpoints."
         }
-      ]
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Lootopia uses motion sensors to anchor AR treasure in your surroundings."
+        }
+      ],
+      "expo-font",
+      "expo-asset",
+      "expo-localization"
     ],
     "ios": {
       "supportsTablet": false
